@@ -30,7 +30,9 @@ function memoryLimit(key: string, max: number, windowMs: number): boolean {
  * Fixed-window limiter. Uses Upstash Redis when UPSTASH_REDIS_REST_URL and
  * UPSTASH_REDIS_REST_TOKEN are set so every instance shares one counter, and
  * falls back to process memory for local dev and single-node deployments.
- * A store outage fails open: a limiter must not lock everyone out of sign-in.
+ * If the shared store errors we degrade to the process-local counter rather
+ * than failing open: the limit still applies per instance, and sign-in keeps
+ * working during a Redis outage.
  */
 export async function rateLimit(key: string, max: number, windowMs: number): Promise<boolean> {
   if (!REDIS_URL || !REDIS_TOKEN) return memoryLimit(key, max, windowMs);
@@ -41,8 +43,8 @@ export async function rateLimit(key: string, max: number, windowMs: number): Pro
     if (count === 1) await redisCall(["PEXPIRE", bucketKey, windowMs]);
     return count <= max;
   } catch (error) {
-    console.error("rate limit store unavailable", error);
-    return true;
+    console.error("rate limit store unavailable, using process-local counter", error);
+    return memoryLimit(key, max, windowMs);
   }
 }
 

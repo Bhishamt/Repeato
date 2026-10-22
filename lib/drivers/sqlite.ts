@@ -16,6 +16,12 @@ export function createSqliteDb(path = ":memory:", schema = SCHEMA): Db {
   handle.pragma("foreign_keys = ON");
   handle.pragma("journal_mode = WAL");
   if (schema) handle.exec(schema);
+  // SQLite has no ADD COLUMN IF NOT EXISTS, so older dev databases get the
+  // column here. New databases already have it from the CREATE TABLE above.
+  const userColumns = handle.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  if (!userColumns.some((column) => column.name === "email_verified")) {
+    handle.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0");
+  }
 
   let lock: Promise<unknown> = Promise.resolve();
 

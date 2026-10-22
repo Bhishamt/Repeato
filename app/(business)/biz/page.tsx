@@ -5,7 +5,7 @@ import { TrendChart, type TrendPoint } from "@/components/trend-chart";
 import { consoleContext } from "@/lib/console";
 import { getDb } from "@/lib/db";
 import { getBalance } from "@/lib/services";
-import { money, points } from "@/lib/format";
+import { money, points, toDate } from "@/lib/format";
 
 export const metadata = { title: "Overview" };
 
@@ -73,8 +73,9 @@ export default async function OverviewPage() {
     .prepare(`SELECT joined_at AS at FROM business_customers WHERE business_id = ? AND joined_at >= ${since}`)
     .all<{ at: string }>(id);
   const bucket = (at: string) => {
-    const days = (now - new Date(at.replace(" ", "T") + "Z").getTime()) / 86400000;
-    return 7 - Math.min(7, Math.max(0, Math.floor(days / 7)));
+    const d = toDate(at);
+    const days = d ? (now - d.getTime()) / 86400000 : 0;
+    return Math.min(7, Math.max(0, 7 - Math.floor(days / 7)));
   };
   for (const row of purchaseRows) weeks[bucket(row.at)].purchases += 1;
   for (const row of memberRows) weeks[bucket(row.at)].members += 1;
@@ -196,7 +197,7 @@ export default async function OverviewPage() {
                 {recent.map((p) => (
                   <tr key={p.id}>
                     <td className="font-medium">{p.customerName}</td>
-                    <td className="whitespace-nowrap text-muted">{new Date(p.createdAt.replace(" ", "T") + "Z").toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</td>
+                    <td className="whitespace-nowrap text-muted">{toDate(p.createdAt)?.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) ?? "—"}</td>
                     <td className="text-right">{money(p.amountPaise)}</td>
                     <td className="text-right font-semibold text-brand">+{points(p.pointsAwarded)}</td>
                     <td><Pill kind={p.status === "verified" ? "ok" : "bad"}>{p.status}</Pill></td>

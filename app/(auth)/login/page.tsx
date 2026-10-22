@@ -10,7 +10,7 @@ export const metadata = { title: "Sign in" };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; error?: string }>;
+  searchParams: Promise<{ next?: string; error?: string; ok?: string }>;
 }) {
   const params = await searchParams;
   const user = await getSessionUser();
@@ -39,6 +39,7 @@ export default async function LoginPage({
           New here? <Link href="/signup" className="link">Create an account</Link>
         </p>
         {params.error ? <div className="mt-4"><Alert kind="bad">{params.error}</Alert></div> : null}
+        {params.ok ? <div className="mt-4"><Alert kind="ok">{params.ok}</Alert></div> : null}
 
         <form action={signIn} className="mt-5">
           {next ? <input type="hidden" name="next" value={next} /> : null}
@@ -46,17 +47,12 @@ export default async function LoginPage({
           <div className="field">
             <div className="flex items-baseline justify-between">
               <label className="label" htmlFor="f_password">Password</label>
-              <span className="hint">Reset by email is not configured yet</span>
+              <span className="hint"><Link href="/forgot" className="link">Forgot password?</Link></span>
             </div>
             <input id="f_password" name="password" type="password" required autoComplete="current-password" className="input" placeholder="••••••••" />
           </div>
           <button className="btn btn-primary btn-block" type="submit">Sign in</button>
         </form>
-
-        <div className="mt-4 rounded-lg border border-dashed border-line bg-paper p-3 text-[0.78rem] text-muted">
-          <strong className="text-ink">No password reset yet.</strong> Repeato has no email provider configured in this
-          deployment, so resets are handled by support. Change your password from your profile once signed in.
-        </div>
 
         <p className="mt-4 text-center text-[0.8rem] text-muted">
           Running a café? <Link href="/signup?as=business" className="link">Create a business account</Link>

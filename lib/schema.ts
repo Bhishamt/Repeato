@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('owner','staff','customer','admin')),
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','suspended')),
+  email_verified INTEGER NOT NULL DEFAULT 0 CHECK (email_verified IN (0,1)),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -176,4 +177,15 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS email_tokens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('verify','reset')),
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_email_tokens_user ON email_tokens(user_id, kind);
 `;

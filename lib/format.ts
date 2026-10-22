@@ -19,22 +19,28 @@ export function withQuery(path: string, key: string, value: string): string {
   return `${path}${path.includes("?") ? "&" : "?"}${key}=${encodeURIComponent(value)}`;
 }
 
-export function dateShort(value: string | null | undefined): string {
-  if (!value) return "—";
+export function toDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  // SQLite stores "2026-09-26 23:02:29", Postgres hands back ISO strings already.
   const d = new Date(value.includes("T") ? value : value.replace(" ", "T") + "Z");
-  if (Number.isNaN(d.getTime())) return "—";
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function dateShort(value: string | null | undefined): string {
+  const d = toDate(value);
+  if (!d) return "—";
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export function dateTime(value: string | null | undefined): string {
-  if (!value) return "—";
-  const d = new Date(value.includes("T") ? value : value.replace(" ", "T") + "Z");
-  if (Number.isNaN(d.getTime())) return "—";
+  const d = toDate(value);
+  if (!d) return "—";
   return d.toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 export function relative(value: string): string {
-  const d = new Date(value.includes("T") ? value : value.replace(" ", "T") + "Z");
+  const d = toDate(value);
+  if (!d) return "—";
   const diff = Date.now() - d.getTime();
   const mins = Math.round(diff / 60000);
   if (mins < 1) return "just now";
