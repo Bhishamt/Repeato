@@ -30,7 +30,7 @@ export default async function VouchersPage({
   const query = await searchParams;
   const db = getDb();
 
-  const vouchers = db
+  const vouchers = await db
     .prepare(
       `SELECT r.id, r.token, r.status, r.points_spent AS pointsSpent, r.issued_at AS issuedAt, r.expires_at AS expiresAt,
               r.redeemed_at AS redeemedAt, rw.name AS rewardName, rw.description AS rewardDescription,
@@ -38,7 +38,7 @@ export default async function VouchersPage({
          FROM redemptions r JOIN rewards rw ON rw.id = r.reward_id JOIN businesses b ON b.id = r.business_id
         WHERE r.customer_id = ? ORDER BY r.id DESC`,
     )
-    .all(user.id) as Voucher[];
+    .all<Voucher>(user.id);
 
   const active = vouchers.filter((v) => v.status === "issued");
   const past = vouchers.filter((v) => v.status !== "issued");

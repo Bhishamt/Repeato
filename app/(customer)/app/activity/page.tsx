@@ -19,35 +19,36 @@ export default async function ActivityPage({
   const db = getDb();
   const page = Math.max(1, Math.min(500, Number(query.page) || 1));
 
-  const memberships = db
+  const memberships = await db
     .prepare(
       `SELECT b.id, b.name, b.slug FROM business_customers bc JOIN businesses b ON b.id = bc.business_id
         WHERE bc.user_id = ? ORDER BY b.name`,
     )
-    .all(user.id) as Array<{ id: number; name: string; slug: string }>;
+    .all<{ id: number; name: string; slug: string }>(user.id);
   const selected = query.b ? memberships.find((m) => m.slug === query.b) : null;
   const scope = selected ? "AND p.business_id = ?" : "";
   const args = selected ? [user.id, selected.id] : [user.id];
 
-  const total = (
-    db.prepare(`SELECT COUNT(*) AS n FROM purchases p WHERE p.customer_id = ? ${scope}`).get(...args) as { n: number }
-  ).n;
+  const total =
+    (await db
+      .prepare(`SELECT COUNT(*) AS n FROM purchases p WHERE p.customer_id = ? ${scope}`)
+      .get<{ n: number }>(...args))?.n ?? 0;
 
-  const purchases = db
+  const purchases = await db
     .prepare(
       `SELECT p.id, p.amount_paise AS amountPaise, p.points_awarded AS pointsAwarded, p.status, p.reference, p.note,
               p.created_at AS createdAt, b.name AS businessName, b.slug AS businessSlug,
-              (SELECT GROUP_CONCAT(pi.quantity || '× ' || pi.name, ', ') FROM purchase_items pi WHERE pi.purchase_id = p.id) AS items
+              (SELECT ${db.listConcat("CAST(pi.quantity AS TEXT) || '× ' || pi.name", ', ')} FROM purchase_items pi WHERE pi.purchase_id = p.id) AS items
          FROM purchases p JOIN businesses b ON b.id = p.business_id
         WHERE p.customer_id = ? ${scope}
         ORDER BY p.id DESC LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`,
     )
-    .all(...args) as Array<{
+    .all<{
     id: number; amountPaise: number; pointsAwarded: number; status: string; reference: string | null; note: string | null;
     createdAt: string; businessName: string; businessSlug: string; items: string | null;
-  }>;
+  }>(...args);
 
-  const redemptions = db
+  const redemptions = await db
     .prepare(
       `SELECT r.id, r.token, r.status, r.points_spent AS pointsSpent, r.issued_at AS issuedAt, r.expires_at AS expiresAt,
               rw.name AS rewardName, b.name AS businessName
@@ -55,9 +56,9 @@ export default async function ActivityPage({
         WHERE r.customer_id = ?
         ORDER BY r.id DESC LIMIT 20`,
     )
-    .all(user.id) as Array<{
+    .all<{
     id: number; token: string; status: string; pointsSpent: number; issuedAt: string; expiresAt: string; rewardName: string; businessName: string;
-  }>;
+  }>(user.id);
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 

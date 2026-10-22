@@ -30,7 +30,7 @@ export default async function RewardsPage({
   const db = getDb();
   const back = "/biz/rewards";
 
-  const rewards = db
+  const rewards = await db
     .prepare(
       `SELECT r.id, r.name, r.description, r.points_cost AS pointsCost, r.stock, r.per_customer_limit AS perCustomerLimit,
               r.valid_until AS validUntil, r.active,
@@ -38,7 +38,7 @@ export default async function RewardsPage({
               (SELECT COUNT(*) FROM redemptions rd WHERE rd.reward_id = r.id AND rd.status = 'issued') AS open
          FROM rewards r WHERE r.business_id = ? ORDER BY r.active DESC, r.points_cost`,
     )
-    .all(business.id) as Reward[];
+    .all<Reward>(business.id);
 
   return (
     <div className="space-y-5">

@@ -15,16 +15,16 @@ export default async function NotificationsPage({
 }) {
   const user = await requireUser("/app/notifications");
   const query = await searchParams;
-  const rows = getDb()
+  const rows = await getDb()
     .prepare(
       `SELECT n.id, n.title, n.body, n.read_at AS readAt, n.created_at AS createdAt, b.name AS businessName, b.slug AS businessSlug
          FROM notifications n LEFT JOIN businesses b ON b.id = n.business_id
         WHERE n.user_id = ? ORDER BY n.id DESC LIMIT 100`,
     )
-    .all(user.id) as Array<{
+    .all<{
     id: number; title: string; body: string | null; readAt: string | null; createdAt: string;
     businessName: string | null; businessSlug: string | null;
-  }>;
+  }>(user.id);
 
   const unread = rows.filter((r) => !r.readAt).length;
 

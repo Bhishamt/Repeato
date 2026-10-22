@@ -17,7 +17,7 @@ export default async function RedemptionsPage({
   const query = await searchParams;
   const db = getDb();
 
-  const rows = db
+  const rows = await db
     .prepare(
       `SELECT r.id, r.token, r.status, r.points_spent AS pointsSpent, r.issued_at AS issuedAt, r.expires_at AS expiresAt,
               r.redeemed_at AS redeemedAt, rw.name AS rewardName, u.name AS customerName, u.id AS customerId,
@@ -28,10 +28,10 @@ export default async function RedemptionsPage({
          LEFT JOIN users s ON s.id = r.redeemed_by
         WHERE r.business_id = ? ORDER BY r.id DESC LIMIT 100`,
     )
-    .all(business.id) as Array<{
-    id: number; token: string; status: string; pointsSpent: number; issuedAt: string; expiresAt: string; redeemedAt: string | null;
-    rewardName: string; customerName: string; customerId: number; redeemedByName: string | null;
-  }>;
+    .all<{
+      id: number; token: string; status: string; pointsSpent: number; issuedAt: string; expiresAt: string; redeemedAt: string | null;
+      rewardName: string; customerName: string; customerId: number; redeemedByName: string | null;
+    }>(business.id);
 
   const open = rows.filter((r) => r.status === "issued");
   const past = rows.filter((r) => r.status !== "issued");

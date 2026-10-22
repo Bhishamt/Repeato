@@ -18,7 +18,7 @@ export default async function AdminBusinesses({
   const db = getDb();
   const term = (query.q || "").trim();
 
-  const rows = db
+  const rows = await db
     .prepare(
       `SELECT b.id, b.name, b.slug, b.category, b.city, b.status, b.created_at AS createdAt,
               (SELECT COUNT(*) FROM business_customers bc WHERE bc.business_id = b.id) AS members,

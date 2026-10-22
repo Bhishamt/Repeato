@@ -13,7 +13,7 @@ type Reward = { id: number; name: string; description: string | null; pointsCost
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const business = getBusinessBySlug(getDb(), slug);
+  const business = await getBusinessBySlug(getDb(), slug);
   return { title: business ? `Join ${business.name}` : "Join a business" };
 }
 
@@ -27,21 +27,21 @@ export default async function JoinPage({
   const { slug } = await params;
   const query = await searchParams;
   const db = getDb();
-  const business = getBusinessBySlug(db, slug);
+  const business = await getBusinessBySlug(db, slug);
   if (!business) notFound();
 
   const user = await getSessionUser();
   const rules = rulesFor(business);
-  const rewards = db
+  const rewards = await db
     .prepare(
       `SELECT id, name, description, points_cost AS pointsCost, stock, valid_until AS validUntil
          FROM rewards WHERE business_id = ? AND active = 1 ORDER BY points_cost ASC`,
     )
-    .all(business.id) as Reward[];
-  const joined = user ? isCustomerOf(db, business.id, user.id) : false;
-  const balance = user && joined ? getBalance(db, business.id, user.id) : 0;
+    .all<Reward>(business.id);
+  const joined = user ? await isCustomerOf(db, business.id, user.id) : false;
+  const balance = user && joined ? await getBalance(db, business.id, user.id) : 0;
   const next = nextRewardProgress(balance, rewards.map((r) => ({ id: r.id, name: r.name, pointsCost: r.pointsCost })));
-  const isTeam = user ? db.prepare("SELECT role FROM business_members WHERE user_id = ? AND business_id = ?").get(user.id, business.id) : null;
+  const isTeam = user ? await db.prepare("SELECT role FROM business_members WHERE user_id = ? AND business_id = ?").get(user.id, business.id) : null;
 
   if (business.status === "suspended") {
     return (

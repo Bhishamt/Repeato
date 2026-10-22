@@ -23,19 +23,19 @@ export async function sendContactMessage(formData: FormData) {
     redirect("/contact?error=" + encodeURIComponent("Add your name, a valid email, and a message of at least 10 characters."));
   }
   const { name, email, business, message } = parsed.data;
-  if (!rateLimit(`contact:${email}`, 3, 60 * 60 * 1000)) {
+  if (!(await rateLimit(`contact:${email}`, 3, 60 * 60 * 1000))) {
     redirect("/contact?error=" + encodeURIComponent("That email has sent several messages already. Try again later."));
   }
 
   const db = getDb();
-  const admins = db.prepare("SELECT id FROM users WHERE role = 'admin' AND status = 'active'").all() as { id: number }[];
+  const admins = await db
+    .prepare("SELECT id FROM users WHERE role = 'admin' AND status = 'active'")
+    .all<{ id: number }>();
   const insert = db.prepare("INSERT INTO notifications (user_id, title, body) VALUES (?, ?, ?)");
   const body = `From ${name} <${email}>${business ? ` (${business})` : ""}\n\n${message}`;
-  for (const admin of admins) insert.run(admin.id, "Website enquiry", body);
-  db.prepare("INSERT INTO audit_log (actor_id, action, entity, entity_id, meta) VALUES (NULL, ?, 'contact', ?, ?)").run(
-    "contact.message",
-    email,
-    JSON.stringify({ name, business }),
-  );
+  for (const admin of admins) await insert.run(admin.id, "Website enquiry", body);
+  await db
+    .prepare("INSERT INTO audit_log (actor_id, action, entity, entity_id, meta) VALUES (NULL, ?, 'contact', ?, ?)")
+    .run("contact.message", email, JSON.stringify({ name, business }));
   redirect("/contact?sent=1");
 }

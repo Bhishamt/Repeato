@@ -15,17 +15,28 @@ export default async function AdminOverview({
   const query = await searchParams;
   const db = getDb();
 
-  const count = (sql: string, ...args: unknown[]) => (db.prepare(sql).get(...args) as { n: number }).n;
-  const users = count("SELECT COUNT(*) AS n FROM users");
-  const businesses = count("SELECT COUNT(*) AS n FROM businesses");
-  const activeBusinesses = count("SELECT COUNT(*) AS n FROM businesses WHERE status = 'active'");
-  const members = count("SELECT COUNT(*) AS n FROM business_customers");
-  const purchases = count("SELECT COUNT(*) AS n FROM purchases WHERE status = 'verified'");
-  const volume = (db.prepare("SELECT COALESCE(SUM(amount_paise),0) AS n FROM purchases WHERE status = 'verified'").get() as { n: number }).n;
-  const redemptions = count("SELECT COUNT(*) AS n FROM redemptions WHERE status = 'redeemed'");
-  const openVouchers = count("SELECT COUNT(*) AS n FROM redemptions WHERE status = 'issued'");
+  const stats =
+    (await db
+      .prepare(
+        `SELECT
+           (SELECT COUNT(*) FROM users) AS users,
+           (SELECT COUNT(*) FROM businesses) AS businesses,
+           (SELECT COUNT(*) FROM businesses WHERE status = 'active') AS "activeBusinesses",
+           (SELECT COUNT(*) FROM business_customers) AS members,
+           (SELECT COUNT(*) FROM purchases WHERE status = 'verified') AS purchases,
+           (SELECT COALESCE(SUM(amount_paise),0) FROM purchases WHERE status = 'verified') AS volume,
+           (SELECT COUNT(*) FROM redemptions WHERE status = 'redeemed') AS redemptions,
+           (SELECT COUNT(*) FROM redemptions WHERE status = 'issued') AS "openVouchers"`,
+      )
+      .get<{
+        users: number; businesses: number; activeBusinesses: number; members: number;
+        purchases: number; volume: number; redemptions: number; openVouchers: number;
+      }>()) ?? {
+      users: 0, businesses: 0, activeBusinesses: 0, members: 0, purchases: 0, volume: 0, redemptions: 0, openVouchers: 0,
+    };
+  const { users, businesses, activeBusinesses, members, purchases, volume, redemptions, openVouchers } = stats;
 
-  const recent = db
+  const recent = await db
     .prepare(
       `SELECT b.id, b.name, b.slug, b.status, b.category, b.city, b.created_at AS createdAt,
               (SELECT COUNT(*) FROM business_customers bc WHERE bc.business_id = b.id) AS members,
@@ -33,11 +44,11 @@ export default async function AdminOverview({
                 WHERE bm.business_id = b.id AND bm.role = 'owner' LIMIT 1) AS ownerEmail
          FROM businesses b ORDER BY b.id DESC LIMIT 6`,
     )
-    .all() as Array<{ id: number; name: string; slug: string; status: string; category: string; city: string | null; createdAt: string; members: number; ownerEmail: string | null }>;
+    .all<{ id: number; name: string; slug: string; status: string; category: string; city: string | null; createdAt: string; members: number; ownerEmail: string | null }>();
 
-  const audit = db
+  const audit = await db
     .prepare("SELECT a.id, a.action, a.entity, a.entity_id AS entityId, a.created_at AS createdAt, u.email AS actor FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id ORDER BY a.id DESC LIMIT 8")
-    .all() as Array<{ id: number; action: string; entity: string; entityId: number | null; createdAt: string; actor: string | null }>;
+    .all<{ id: number; action: string; entity: string; entityId: number | null; createdAt: string; actor: string | null }>();
 
   return (
     <div className="space-y-5">

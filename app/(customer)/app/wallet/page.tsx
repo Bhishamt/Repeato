@@ -17,7 +17,7 @@ export default async function WalletPage({
   const query = await searchParams;
   const db = getDb();
 
-  const memberships = db
+  const memberships = await db
     .prepare(
       `SELECT b.id, b.name, b.slug, b.brand_color AS brandColor, b.points_per_100 AS pointsPer100,
               b.min_purchase_paise AS minPurchasePaise, b.min_redeem_points AS minRedeemPoints,
@@ -25,33 +25,36 @@ export default async function WalletPage({
          FROM business_customers bc JOIN businesses b ON b.id = bc.business_id
         WHERE bc.user_id = ? ORDER BY b.name`,
     )
-    .all(user.id) as Array<{
+    .all<{
     id: number; name: string; slug: string; brandColor: string; pointsPer100: number;
     minPurchasePaise: number; minRedeemPoints: number; maxPointsPerTxn: number;
-  }>;
+  }>(user.id);
 
   const selected = query.b ? memberships.find((m) => m.slug === query.b) : null;
-  const wallets = memberships.map((m) => {
-    const balance = getBalance(db, m.id, user.id);
-    const earned = db
-      .prepare("SELECT COALESCE(SUM(delta), 0) AS n FROM ledger WHERE business_id = ? AND customer_id = ? AND delta > 0")
-      .get(m.id, user.id) as { n: number };
-    const spent = db
-      .prepare("SELECT COALESCE(SUM(-delta), 0) AS n FROM ledger WHERE business_id = ? AND customer_id = ? AND delta < 0")
-      .get(m.id, user.id) as { n: number };
-    return { ...m, balance, earned: earned.n, spent: spent.n };
-  });
+  const wallets = [];
+  for (const m of memberships) {
+    const balance = await getBalance(db, m.id, user.id);
+    const earned =
+      (await db
+        .prepare("SELECT COALESCE(SUM(delta), 0) AS n FROM ledger WHERE business_id = ? AND customer_id = ? AND delta > 0")
+        .get<{ n: number }>(m.id, user.id))?.n ?? 0;
+    const spent =
+      (await db
+        .prepare("SELECT COALESCE(SUM(-delta), 0) AS n FROM ledger WHERE business_id = ? AND customer_id = ? AND delta < 0")
+        .get<{ n: number }>(m.id, user.id))?.n ?? 0;
+    wallets.push({ ...m, balance, earned, spent });
+  }
 
-  const entries = db
+  const entries = await db
     .prepare(
       `SELECT l.id, l.delta, l.kind, l.note, l.created_at AS createdAt, b.name AS businessName, b.slug AS businessSlug
          FROM ledger l JOIN businesses b ON b.id = l.business_id
         WHERE l.customer_id = ? ${selected ? "AND l.business_id = ?" : ""}
         ORDER BY l.id DESC LIMIT 40`,
     )
-    .all(...(selected ? [user.id, selected.id] : [user.id])) as Array<{
-    id: number; delta: number; kind: string; note: string | null; createdAt: string; businessName: string; businessSlug: string;
-  }>;
+    .all<{
+      id: number; delta: number; kind: string; note: string | null; createdAt: string; businessName: string; businessSlug: string;
+    }>(...(selected ? [user.id, selected.id] : [user.id]));
 
   const total = wallets.reduce((sum, w) => sum + w.balance, 0);
 

@@ -19,27 +19,29 @@ export default async function BusinessesPage({
   const db = getDb();
   const term = (query.q || "").trim();
 
-  const rows = db
+  const rows = await db
     .prepare(
       `SELECT b.id, b.name, b.slug, b.category, b.city, b.description, b.brand_color AS brandColor,
               b.points_per_100 AS pointsPer100, b.signup_bonus AS signupBonus,
               EXISTS (SELECT 1 FROM business_customers bc WHERE bc.business_id = b.id AND bc.user_id = ?) AS isMember
          FROM businesses b
-        WHERE b.status = 'active' AND (b.name LIKE ? OR b.city LIKE ? OR b.category LIKE ?)
+        WHERE b.status = 'active' AND (LOWER(b.name) LIKE LOWER(?) OR LOWER(b.city) LIKE LOWER(?) OR LOWER(b.category) LIKE LOWER(?))
         ORDER BY isMember DESC, b.name`,
     )
-    .all(user.id, `%${term}%`, `%${term}%`, `%${term}%`) as Array<{
+    .all<{
     id: number; name: string; slug: string; category: string; city: string | null; description: string | null;
     brandColor: string; pointsPer100: number; signupBonus: number; isMember: number;
-  }>;
+  }>(user.id, `%${term}%`, `%${term}%`, `%${term}%`);
 
-  const cards = rows.map((b) => ({
-    ...b,
-    balance: b.isMember ? getBalance(db, b.id, user.id) : 0,
-    rewardCount: (
-      db.prepare("SELECT COUNT(*) AS n FROM rewards WHERE business_id = ? AND active = 1").get(b.id) as { n: number }
-    ).n,
-  }));
+  const cards = [];
+  for (const b of rows) {
+    const balance = b.isMember ? await getBalance(db, b.id, user.id) : 0;
+    const rewardCount =
+      (await db
+        .prepare("SELECT COUNT(*) AS n FROM rewards WHERE business_id = ? AND active = 1")
+        .get<{ n: number }>(b.id))?.n ?? 0;
+    cards.push({ ...b, balance, rewardCount });
+  }
 
   return (
     <div className="space-y-5">

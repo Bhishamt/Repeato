@@ -22,29 +22,32 @@ export default async function TransactionsPage({
   const page = Math.max(1, Math.min(999, Number(query.page) || 1));
   const term = (query.q || "").trim();
 
-  const customers = db
+  const customers = await db
     .prepare(
       `SELECT u.id, u.name, u.email FROM business_customers bc JOIN users u ON u.id = bc.user_id
         WHERE bc.business_id = ? ORDER BY u.name`,
     )
-    .all(business.id) as Array<{ id: number; name: string; email: string }>;
+    .all<{ id: number; name: string; email: string }>(business.id);
 
-  const where = `p.business_id = ?${term ? " AND (u.name LIKE ? OR u.email LIKE ? OR p.reference LIKE ?)" : ""}`;
+  const where = `p.business_id = ?${term ? " AND (LOWER(u.name) LIKE LOWER(?) OR LOWER(u.email) LIKE LOWER(?) OR LOWER(p.reference) LIKE LOWER(?))" : ""}`;
   const args = term ? [business.id, `%${term}%`, `%${term}%`, `%${term}%`] : [business.id];
 
-  const total = (db.prepare(`SELECT COUNT(*) AS n FROM purchases p JOIN users u ON u.id = p.customer_id WHERE ${where}`).get(...args) as { n: number }).n;
+  const total =
+    (await db
+      .prepare(`SELECT COUNT(*) AS n FROM purchases p JOIN users u ON u.id = p.customer_id WHERE ${where}`)
+      .get<{ n: number }>(...args))?.n ?? 0;
 
-  const rows = db
+  const rows = await db
     .prepare(
-      `SELECT p.id, p.amount_paise AS amountPaise, p.points_awarded AS pointsAwarded, p.status, p.reference,
-              p.created_at AS createdAt, u.id AS customerId, u.name AS customerName, s.name AS staffName
+      `SELECT p.id, p.amount_paise AS "amountPaise", p.points_awarded AS "pointsAwarded", p.status, p.reference,
+              p.created_at AS "createdAt", u.id AS "customerId", u.name AS "customerName", s.name AS "staffName"
          FROM purchases p JOIN users u ON u.id = p.customer_id JOIN users s ON s.id = p.staff_id
         WHERE ${where} ORDER BY p.id DESC LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`,
     )
-    .all(...args) as Array<{
-    id: number; amountPaise: number; pointsAwarded: number; status: string; reference: string | null; createdAt: string;
-    customerId: number; customerName: string; staffName: string;
-  }>;
+    .all<{
+      id: number; amountPaise: number; pointsAwarded: number; status: string; reference: string | null; createdAt: string;
+      customerId: number; customerName: string; staffName: string;
+    }>(...args);
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const back = `/biz/transactions${term ? `?q=${encodeURIComponent(term)}` : ""}`;

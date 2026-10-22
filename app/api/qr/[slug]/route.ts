@@ -13,13 +13,13 @@ function baseUrl(request: Request) {
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const db = getDb();
-  const business = getBusinessBySlug(db, slug);
+  const business = await getBusinessBySlug(db, slug);
   if (!business) return new NextResponse("Not found", { status: 404 });
 
   // QR images are tenant-private: only members of that business (or an admin) may download them.
   const user = await getSessionUser();
   if (!user) return new NextResponse("Unauthorized", { status: 401 });
-  if (user.role !== "admin" && !memberRole(db, user.id, business.id)) {
+  if (user.role !== "admin" && !(await memberRole(db, user.id, business.id))) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 

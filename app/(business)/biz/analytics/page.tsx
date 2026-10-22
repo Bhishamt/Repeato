@@ -26,85 +26,97 @@ export default async function AnalyticsPage({
   const db = getDb();
   const id = business.id;
 
-  const totals = (offsetDays: number): Totals => {
-    const from = `-${days + offsetDays} days`;
-    const to = offsetDays ? `-${offsetDays} days` : "now";
-    const purchases = db
-      .prepare(
-        `SELECT COUNT(*) AS n, COALESCE(SUM(amount_paise),0) AS revenue FROM purchases
-          WHERE business_id = ? AND status = 'verified' AND created_at >= datetime('now', ?) AND created_at < datetime('now', ?)`,
-      )
-      .get(id, from, to) as { n: number; revenue: number };
-    const members = (
-      db.prepare(
-        `SELECT COUNT(*) AS n FROM business_customers WHERE business_id = ?
-          AND joined_at >= datetime('now', ?) AND joined_at < datetime('now', ?)`,
-      ).get(id, from, to) as { n: number }
-    ).n;
-    const issued = (
-      db.prepare(
-        `SELECT COALESCE(SUM(delta),0) AS n FROM ledger WHERE business_id = ? AND delta > 0
-          AND created_at >= datetime('now', ?) AND created_at < datetime('now', ?)`,
-      ).get(id, from, to) as { n: number }
-    ).n;
-    const redeemed = (
-      db.prepare(
-        `SELECT COALESCE(SUM(-delta),0) AS n FROM ledger WHERE business_id = ? AND kind = 'redeem'
-          AND created_at >= datetime('now', ?) AND created_at < datetime('now', ?)`,
-      ).get(id, from, to) as { n: number }
-    ).n;
-    const redemptions = (
-      db.prepare(
-        `SELECT COUNT(*) AS n FROM redemptions WHERE business_id = ? AND status = 'redeemed'
-          AND redeemed_at >= datetime('now', ?) AND redeemed_at < datetime('now', ?)`,
-      ).get(id, from, to) as { n: number }
-    ).n;
+  const totals = async (offsetDays: number): Promise<Totals> => {
+    const from = db.daysAgo(days + offsetDays);
+    const before = (column: string) => (offsetDays ? ` AND ${column} < ${db.daysAgo(offsetDays)}` : "");
+    const purchases =
+      (await db
+        .prepare(
+          `SELECT COUNT(*) AS n, COALESCE(SUM(amount_paise),0) AS revenue FROM purchases
+            WHERE business_id = ? AND status = 'verified' AND created_at >= ${from}${before("created_at")}`,
+        )
+        .get<{ n: number; revenue: number }>(id)) ?? { n: 0, revenue: 0 };
+    const members =
+      (await db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM business_customers WHERE business_id = ?
+            AND joined_at >= ${from}${before("joined_at")}`,
+        )
+        .get<{ n: number }>(id))?.n ?? 0;
+    const issued =
+      (await db
+        .prepare(
+          `SELECT COALESCE(SUM(delta),0) AS n FROM ledger WHERE business_id = ? AND delta > 0
+            AND created_at >= ${from}${before("created_at")}`,
+        )
+        .get<{ n: number }>(id))?.n ?? 0;
+    const redeemed =
+      (await db
+        .prepare(
+          `SELECT COALESCE(SUM(-delta),0) AS n FROM ledger WHERE business_id = ? AND kind = 'redeem'
+            AND created_at >= ${from}${before("created_at")}`,
+        )
+        .get<{ n: number }>(id))?.n ?? 0;
+    const redemptions =
+      (await db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM redemptions WHERE business_id = ? AND status = 'redeemed'
+            AND redeemed_at >= ${from}${before("redeemed_at")}`,
+        )
+        .get<{ n: number }>(id))?.n ?? 0;
     return { purchases: purchases.n, revenue: purchases.revenue, members, issued, redeemed, redemptions };
   };
 
-  const current = totals(0);
-  const previous = totals(days);
+  const current = await totals(0);
+  const previous = await totals(days);
 
-  const repeat = db
-    .prepare(
-      `SELECT COUNT(*) AS repeat FROM (
-         SELECT customer_id FROM purchases
-          WHERE business_id = ? AND status = 'verified' AND created_at >= datetime('now', ?)
-          GROUP BY customer_id HAVING COUNT(*) >= 2)`,
-    )
-    .get(id, `-${days} days`) as { repeat: number };
-  const visiting = (
-    db.prepare(
-      `SELECT COUNT(DISTINCT customer_id) AS n FROM purchases
-        WHERE business_id = ? AND status = 'verified' AND created_at >= datetime('now', ?)`,
-    ).get(id, `-${days} days`) as { n: number }
-  ).n;
-  const repeatRate = visiting ? Math.round((repeat.repeat / visiting) * 100) : 0;
+  const since = db.daysAgo(days);
+  const repeat =
+    (await db
+      .prepare(
+        `SELECT COUNT(*) AS repeat FROM (
+           SELECT customer_id FROM purchases
+            WHERE business_id = ? AND status = 'verified' AND created_at >= ${since}
+            GROUP BY customer_id HAVING COUNT(*) >= 2) t`,
+      )
+      .get<{ repeat: number }>(id))?.repeat ?? 0;
+  const visiting =
+    (await db
+      .prepare(
+        `SELECT COUNT(DISTINCT customer_id) AS n FROM purchases
+          WHERE business_id = ? AND status = 'verified' AND created_at >= ${since}`,
+      )
+      .get<{ n: number }>(id))?.n ?? 0;
+  const repeatRate = visiting ? Math.round((repeat / visiting) * 100) : 0;
 
-  const topRewards = db
+  const topRewards = await db
     .prepare(
       `SELECT rw.name, COUNT(*) AS n FROM redemptions r JOIN rewards rw ON rw.id = r.reward_id
-        WHERE r.business_id = ? AND r.status = 'redeemed' AND r.redeemed_at >= datetime('now', ?)
-        GROUP BY rw.id ORDER BY n DESC LIMIT 5`,
+        WHERE r.business_id = ? AND r.status = 'redeemed' AND r.redeemed_at >= ${since}
+        GROUP BY rw.id, rw.name ORDER BY n DESC LIMIT 5`,
     )
-    .all(id, `-${days} days`) as Array<{ name: string; n: number }>;
+    .all<{ name: string; n: number }>(id);
 
-  const topCustomers = db
+  const topCustomers = await db
     .prepare(
       `SELECT u.id, u.name, COUNT(*) AS visits, COALESCE(SUM(p.amount_paise),0) AS spend
          FROM purchases p JOIN users u ON u.id = p.customer_id
-        WHERE p.business_id = ? AND p.status = 'verified' AND p.created_at >= datetime('now', ?)
-        GROUP BY u.id ORDER BY spend DESC LIMIT 5`,
+        WHERE p.business_id = ? AND p.status = 'verified' AND p.created_at >= ${since}
+        GROUP BY u.id, u.name ORDER BY spend DESC LIMIT 5`,
     )
-    .all(id, `-${days} days`) as Array<{ id: number; name: string; visits: number; spend: number }>;
+    .all<{ id: number; name: string; visits: number; spend: number }>(id);
 
-  const weekdays = db
-    .prepare(
-      `SELECT CAST(strftime('%w', created_at) AS INTEGER) AS dow, COUNT(*) AS n FROM purchases
-        WHERE business_id = ? AND status = 'verified' AND created_at >= datetime('now', ?)
-        GROUP BY dow ORDER BY dow`,
-    )
-    .all(id, `-${days} days`) as Array<{ dow: number; n: number }>;
+  // Weekday buckets are counted in JS: strftime() is SQLite-only, extract() Postgres-only.
+  const visitTimes = await db
+    .prepare(`SELECT created_at AS at FROM purchases WHERE business_id = ? AND status = 'verified' AND created_at >= ${since}`)
+    .all<{ at: string }>(id);
+  const weekdayCounts = new Array(7).fill(0) as number[];
+  for (const row of visitTimes) {
+    const raw = String(row.at);
+    const parsed = new Date(raw.includes("T") ? raw : `${raw.replace(" ", "T")}Z`);
+    if (!Number.isNaN(parsed.getTime())) weekdayCounts[parsed.getUTCDay()] += 1;
+  }
+  const weekdays = weekdayCounts.map((n, dow) => ({ dow, n }));
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const busiest = Math.max(1, ...weekdays.map((w) => w.n));
 
@@ -147,7 +159,7 @@ export default async function AnalyticsPage({
         <section className="card card-pad">
           <h2 className="text-[0.98rem] font-semibold">Repeat visits</h2>
           <p className="mt-0.5 text-[0.78rem] text-muted">
-            Of {visiting} member{visiting === 1 ? "" : "s"} who bought in the last {days} days, {repeat.repeat} came more than once.
+            Of {visiting} member{visiting === 1 ? "" : "s"} who bought in the last {days} days, {repeat} came more than once.
           </p>
           <div className="mt-4 flex items-end gap-4">
             <p className="display text-[3rem] leading-none">{repeatRate}%</p>

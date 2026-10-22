@@ -14,8 +14,7 @@ sale. Nothing about a balance is ever accepted from a browser.
 | --- | --- |
 | Framework | Next.js 16.4 (App Router, Turbopack), React 19, TypeScript strict |
 | Styling | Tailwind CSS 4 with a small token layer in `app/globals.css`; Lucide icons |
-| Data (this build) | SQLite via `better-sqlite3` (WAL, foreign keys, schema in `lib/schema.ts`) |
-| Data (production target) | Supabase / Postgres with RLS — `supabase/migrations/` |
+| Data | SQLite (`better-sqlite3`) or PostgreSQL (`pg`) behind one interface in `lib/db.ts` |
 | Server logic | Server Components + Server Actions; all mutations in `lib/services.ts` |
 | Tests | Vitest (domain + services), Playwright (browser flows) |
 | Charts | Recharts (`components/trend-chart.tsx`) |
@@ -96,27 +95,31 @@ traction.
 npm run dev        # dev server on :3000
 npm run build      # production build
 npm start          # serve the build
-npm test           # Vitest: points, services
+npm test           # Vitest: points, services, RLS (RLS needs PG_TEST_URL)
 npx playwright test# browser flows (starts its own dev server)
 npm run typecheck  # tsc --noEmit
 npm run seed       # demo data
+node scripts/pg.mjs start     # local PostgreSQL 18.4 on :55432
+node scripts/migrate.mjs      # apply supabase/migrations/*.sql
 ```
 
 ## Environment
 
-Copy `.env.example` to `.env.local`. The app itself reads only `DATABASE_PATH` (default
-`./data/repeato.db`); the seed also reads `APP_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` and
-`DEMO_PASSWORD`. The commented Supabase keys are for the Postgres adapter described in
-`docs/DEPLOYMENT.md` — this build does not require them.
+Copy `.env.example` to `.env.local`. The app picks its engine from the environment:
+`DATABASE_URL` (Postgres) wins, otherwise `DATABASE_PATH` (SQLite, default `./data/repeato.db`). The
+seed also reads `APP_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` and `DEMO_PASSWORD`; the RLS suite reads
+`PG_TEST_URL`; `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` switch rate limiting to a shared
+store.
 
 ## Data layer, stated plainly
 
-This repository runs on SQLite because no Supabase project could be provisioned in the build
-environment (no access token, no Docker for a local stack). The domain logic, transactions,
-tenancy checks and tests are real and are the same logic the Postgres deployment would run.
-`supabase/migrations/0001_init.sql` and `0002_rls.sql` are the production schema and policies;
-they are not exercised by the running app. Details and the exact gap are in
-`docs/KNOWN_LIMITATIONS.md`.
+One interface (`lib/db.ts`) with two drivers: `better-sqlite3` for local development and a `pg` pool
+for PostgreSQL. Both are real and both are exercised — `npx playwright test` passes 4/4 with the app
+running on SQLite and 4/4 with `DATABASE_URL` pointing at PostgreSQL 18.4, and the RLS policies are
+verified against that same server by `test/pg-rls.test.ts` (11 tests). What was **not** possible this
+session is a run against a hosted Supabase project: no access token and no Docker were available, so
+the migration has been proven on a real PostgreSQL server but not on Supabase itself. `docs/DEPLOYMENT.md`
+has the exact steps, and `docs/KNOWN_LIMITATIONS.md` lists the rest.
 
 ## Docs
 

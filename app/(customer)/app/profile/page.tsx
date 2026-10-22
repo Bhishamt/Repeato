@@ -17,15 +17,15 @@ export default async function ProfilePage({
   const user = await requireUser("/app/profile");
   const query = await searchParams;
   const db = getDb();
-  const row = db
+  const row = await db
     .prepare("SELECT phone, created_at AS createdAt FROM users WHERE id = ?")
-    .get(user.id) as { phone: string | null; createdAt: string };
-  const memberships = db
+    .get<{ phone: string | null; createdAt: string }>(user.id) ?? { phone: null, createdAt: new Date().toISOString() };
+  const memberships = await db
     .prepare(
       `SELECT b.name, b.slug, bc.joined_at AS joinedAt FROM business_customers bc
          JOIN businesses b ON b.id = bc.business_id WHERE bc.user_id = ? ORDER BY b.name`,
     )
-    .all(user.id) as Array<{ name: string; slug: string; joinedAt: string }>;
+    .all<{ name: string; slug: string; joinedAt: string }>(user.id);
 
   return (
     <div className="space-y-5">

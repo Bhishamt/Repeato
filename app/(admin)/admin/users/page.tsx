@@ -16,7 +16,7 @@ export default async function AdminUsers({
   const db = getDb();
   const term = (query.q || "").trim();
 
-  const rows = db
+  const rows = await db
     .prepare(
       `SELECT u.id, u.name, u.email, u.role, u.status, u.created_at AS createdAt,
               (SELECT COUNT(*) FROM business_customers bc WHERE bc.user_id = u.id) AS wallets,

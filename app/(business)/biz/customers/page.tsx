@@ -20,28 +20,29 @@ export default async function CustomersPage({
   const page = Math.max(1, Math.min(999, Number(query.page) || 1));
   const term = (query.q || "").trim();
 
-  const where = `bc.business_id = ?${term ? " AND (u.name LIKE ? OR u.email LIKE ?)" : ""}`;
+  const where = `bc.business_id = ?${term ? " AND (LOWER(u.name) LIKE LOWER(?) OR LOWER(u.email) LIKE LOWER(?))" : ""}`;
   const args = term ? [business.id, `%${term}%`, `%${term}%`] : [business.id];
 
-  const total = (
-    db.prepare(`SELECT COUNT(*) AS n FROM business_customers bc JOIN users u ON u.id = bc.user_id WHERE ${where}`).get(...args) as { n: number }
-  ).n;
+  const total =
+    (await db
+      .prepare(`SELECT COUNT(*) AS n FROM business_customers bc JOIN users u ON u.id = bc.user_id WHERE ${where}`)
+      .get<{ n: number }>(...args)) ?? { n: 0 };
 
-  const rows = db
+  const rows = await db
     .prepare(
-      `SELECT u.id, u.name, u.email, bc.joined_at AS joinedAt,
+      `SELECT u.id, u.name, u.email, bc.joined_at AS "joinedAt",
               COALESCE((SELECT SUM(delta) FROM ledger l WHERE l.business_id = bc.business_id AND l.customer_id = u.id), 0) AS balance,
               (SELECT COUNT(*) FROM purchases p WHERE p.business_id = bc.business_id AND p.customer_id = u.id AND p.status = 'verified') AS visits,
-              (SELECT MAX(p.created_at) FROM purchases p WHERE p.business_id = bc.business_id AND p.customer_id = u.id AND p.status = 'verified') AS lastVisit
+              (SELECT MAX(p.created_at) FROM purchases p WHERE p.business_id = bc.business_id AND p.customer_id = u.id AND p.status = 'verified') AS "lastVisit"
          FROM business_customers bc JOIN users u ON u.id = bc.user_id
         WHERE ${where}
         ORDER BY bc.joined_at DESC LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`,
     )
-    .all(...args) as Array<{
-    id: number; name: string; email: string; joinedAt: string; balance: number; visits: number; lastVisit: string | null;
-  }>;
+    .all<{
+      id: number; name: string; email: string; joinedAt: string; balance: number; visits: number; lastVisit: string | null;
+    }>(...args);
 
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pages = Math.max(1, Math.ceil(total.n / PAGE_SIZE));
 
   return (
     <div className="space-y-5">
@@ -49,7 +50,7 @@ export default async function CustomersPage({
         <div>
           <p className="eyebrow mb-1">Members</p>
           <h1 className="display text-[1.8rem] md:text-[2.2rem]">Customers</h1>
-          <p className="mt-1 text-[0.9rem] text-muted">{total} people have joined {business.name}.</p>
+          <p className="mt-1 text-[0.9rem] text-muted">{total.n} people have joined {business.name}.</p>
         </div>
         <form action="/biz/customers" className="flex gap-2">
           <label htmlFor="q" className="sr-only">Search customers</label>

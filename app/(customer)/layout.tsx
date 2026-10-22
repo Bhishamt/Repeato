@@ -8,9 +8,10 @@ import { signOut } from "@/app/actions/auth";
 
 export default async function CustomerLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser("/app");
-  const unread = (
-    getDb().prepare("SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL").get(user.id) as { n: number }
-  ).n;
+  const unread =
+    (await getDb()
+      .prepare("SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL")
+      .get<{ n: number }>(user.id))?.n ?? 0;
 
   return (
     <div className="min-h-dvh bg-paper pb-20 md:pb-0">

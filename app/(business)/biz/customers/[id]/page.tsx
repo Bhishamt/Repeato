@@ -23,56 +23,59 @@ export default async function CustomerDetailPage({
   if (!Number.isInteger(customerId) || customerId < 1) notFound();
 
   const db = getDb();
-  const customer = db
+  const customer = await db
     .prepare(
-      `SELECT u.id, u.name, u.email, u.phone, bc.joined_at AS joinedAt
+      `SELECT u.id, u.name, u.email, u.phone, bc.joined_at AS "joinedAt"
          FROM business_customers bc JOIN users u ON u.id = bc.user_id
         WHERE bc.business_id = ? AND u.id = ?`,
     )
-    .get(business.id, customerId) as { id: number; name: string; email: string; phone: string | null; joinedAt: string } | undefined;
+    .get<{ id: number; name: string; email: string; phone: string | null; joinedAt: string }>(business.id, customerId);
   if (!customer) notFound();
 
-  const balance = (
-    db.prepare("SELECT COALESCE(SUM(delta),0) AS n FROM ledger WHERE business_id = ? AND customer_id = ?").get(business.id, customerId) as { n: number }
-  ).n;
-  const stats = db
+  const balance =
+    (await db
+      .prepare("SELECT COALESCE(SUM(delta),0) AS n FROM ledger WHERE business_id = ? AND customer_id = ?")
+      .get<{ n: number }>(business.id, customerId))?.n ?? 0;
+  const stats = await db
     .prepare(
-      `SELECT COUNT(*) AS visits, COALESCE(SUM(amount_paise),0) AS spend, MAX(created_at) AS lastVisit
+      `SELECT COUNT(*) AS visits, COALESCE(SUM(amount_paise),0) AS spend, MAX(created_at) AS "lastVisit"
          FROM purchases WHERE business_id = ? AND customer_id = ? AND status = 'verified'`,
     )
-    .get(business.id, customerId) as { visits: number; spend: number; lastVisit: string | null };
-  const issued = (
-    db.prepare("SELECT COALESCE(SUM(delta),0) AS n FROM ledger WHERE business_id = ? AND customer_id = ? AND delta > 0").get(business.id, customerId) as { n: number }
-  ).n;
-  const spent = (
-    db.prepare("SELECT COALESCE(SUM(-delta),0) AS n FROM ledger WHERE business_id = ? AND customer_id = ? AND delta < 0").get(business.id, customerId) as { n: number }
-  ).n;
+    .get<{ visits: number; spend: number; lastVisit: string | null }>(business.id, customerId) ?? { visits: 0, spend: 0, lastVisit: null };
+  const issued =
+    (await db
+      .prepare("SELECT COALESCE(SUM(delta),0) AS n FROM ledger WHERE business_id = ? AND customer_id = ? AND delta > 0")
+      .get<{ n: number }>(business.id, customerId))?.n ?? 0;
+  const spent =
+    (await db
+      .prepare("SELECT COALESCE(SUM(-delta),0) AS n FROM ledger WHERE business_id = ? AND customer_id = ? AND delta < 0")
+      .get<{ n: number }>(business.id, customerId))?.n ?? 0;
 
-  const purchases = db
+  const purchases = await db
     .prepare(
-      `SELECT p.id, p.amount_paise AS amountPaise, p.points_awarded AS pointsAwarded, p.status, p.reference, p.created_at AS createdAt,
-              s.name AS staffName
+      `SELECT p.id, p.amount_paise AS "amountPaise", p.points_awarded AS "pointsAwarded", p.status, p.reference, p.created_at AS "createdAt",
+              s.name AS "staffName"
          FROM purchases p JOIN users s ON s.id = p.staff_id
         WHERE p.business_id = ? AND p.customer_id = ? ORDER BY p.id DESC LIMIT 30`,
     )
-    .all(business.id, customerId) as Array<{
-    id: number; amountPaise: number; pointsAwarded: number; status: string; reference: string | null; createdAt: string; staffName: string;
-  }>;
+    .all<{
+      id: number; amountPaise: number; pointsAwarded: number; status: string; reference: string | null; createdAt: string; staffName: string;
+    }>(business.id, customerId);
 
-  const ledger = db
+  const ledger = await db
     .prepare(
-      `SELECT id, delta, kind, note, created_at AS createdAt FROM ledger
+      `SELECT id, delta, kind, note, created_at AS "createdAt" FROM ledger
         WHERE business_id = ? AND customer_id = ? ORDER BY id DESC LIMIT 30`,
     )
-    .all(business.id, customerId) as Array<{ id: number; delta: number; kind: string; note: string | null; createdAt: string }>;
+    .all<{ id: number; delta: number; kind: string; note: string | null; createdAt: string }>(business.id, customerId);
 
-  const vouchers = db
+  const vouchers = await db
     .prepare(
-      `SELECT r.token, r.status, r.points_spent AS pointsSpent, r.issued_at AS issuedAt, rw.name AS rewardName
+      `SELECT r.token, r.status, r.points_spent AS "pointsSpent", r.issued_at AS "issuedAt", rw.name AS "rewardName"
          FROM redemptions r JOIN rewards rw ON rw.id = r.reward_id
         WHERE r.business_id = ? AND r.customer_id = ? ORDER BY r.id DESC LIMIT 10`,
     )
-    .all(business.id, customerId) as Array<{ token: string; status: string; pointsSpent: number; issuedAt: string; rewardName: string }>;
+    .all<{ token: string; status: string; pointsSpent: number; issuedAt: string; rewardName: string }>(business.id, customerId);
 
   return (
     <div className="space-y-5">

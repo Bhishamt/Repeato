@@ -4,7 +4,16 @@ Two artefacts describe the same model:
 
 - `lib/schema.ts` — SQLite DDL the running app applies on boot (idempotent `CREATE … IF NOT EXISTS`).
 - `supabase/migrations/0001_init.sql` — Postgres/Supabase equivalent, plus `0002_rls.sql` for
-  policies. Same columns, `uuid` primary keys, `timestamptz` timestamps.
+  policies. Same columns, `bigint` identity primary keys, `timestamptz` timestamps.
+
+Both are reachable at runtime through the single `Db` interface in `lib/db.ts`
+(`prepare().get/all/run`, `insert`, `transaction`, `engine`), so services never know which engine is
+underneath. Migrations are applied by `scripts/migrate.mjs`, which records each file in
+`schema_migrations`; re-running is safe.
+
+Dialect note: `products.available`, `products.archived` and `rewards.active` are `integer` with
+`check (col in (0, 1))` rather than `boolean`, because the application compares them to `0`/`1` and
+the same SQL must run on SQLite. Changing them to `boolean` means rewriting every predicate.
 
 ## Conventions
 

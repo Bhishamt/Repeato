@@ -35,10 +35,10 @@ export default async function MenuPage({
   const db = getDb();
   const editId = Number(query.edit) || 0;
 
-  const categories = db
+  const categories = await db
     .prepare("SELECT id, name FROM categories WHERE business_id = ? ORDER BY sort_order, name")
-    .all(business.id) as Array<{ id: number; name: string }>;
-  const products = db
+    .all<{ id: number; name: string }>(business.id);
+  const products = await db
     .prepare(
       `SELECT p.id, p.name, p.description, p.price_paise AS pricePaise, p.points_override AS pointsOverride,
               p.available, p.category_id AS categoryId, c.name AS categoryName
@@ -46,7 +46,7 @@ export default async function MenuPage({
         WHERE p.business_id = ? AND p.archived = 0
         ORDER BY c.sort_order IS NULL, c.sort_order, c.name, p.name`,
     )
-    .all(business.id) as Product[];
+    .all<Product>(business.id);
 
   const back = "/biz/menu";
 

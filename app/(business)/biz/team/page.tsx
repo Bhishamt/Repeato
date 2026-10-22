@@ -16,13 +16,13 @@ export default async function TeamPage({
   const query = await searchParams;
   const db = getDb();
 
-  const team = db
+  const team = await db
     .prepare(
       `SELECT u.id, u.name, u.email, u.role AS accountRole, bm.role, bm.created_at AS addedAt
          FROM business_members bm JOIN users u ON u.id = bm.user_id
         WHERE bm.business_id = ? ORDER BY bm.role = 'owner' DESC, u.name`,
     )
-    .all(business.id) as Array<{ id: number; name: string; email: string; accountRole: string; role: string; addedAt: string }>;
+    .all<{ id: number; name: string; email: string; accountRole: string; role: string; addedAt: string }>(business.id);
 
   return (
     <div className="space-y-5">

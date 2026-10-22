@@ -14,41 +14,47 @@ export default async function OverviewPage() {
   const db = getDb();
   const id = business.id;
 
-  const members = (db.prepare("SELECT COUNT(*) AS n FROM business_customers WHERE business_id = ?").get(id) as { n: number }).n;
-  const newMembers = (
-    db.prepare("SELECT COUNT(*) AS n FROM business_customers WHERE business_id = ? AND joined_at >= datetime('now','-30 days')").get(id) as { n: number }
-  ).n;
-  const purchases = db
-    .prepare(
-      `SELECT COUNT(*) AS n, COALESCE(SUM(amount_paise),0) AS amount
-         FROM purchases WHERE business_id = ? AND status = 'verified' AND created_at >= datetime('now','-30 days')`,
-    )
-    .get(id) as { n: number; amount: number };
-  const issued = (
-    db.prepare("SELECT COALESCE(SUM(delta),0) AS n FROM ledger WHERE business_id = ? AND delta > 0 AND created_at >= datetime('now','-30 days')").get(id) as { n: number }
-  ).n;
-  const redeemed = (
-    db.prepare("SELECT COALESCE(SUM(-delta),0) AS n FROM ledger WHERE business_id = ? AND kind = 'redeem' AND created_at >= datetime('now','-30 days')").get(id) as { n: number }
-  ).n;
-  const openVouchers = (
-    db.prepare("SELECT COUNT(*) AS n FROM redemptions WHERE business_id = ? AND status = 'issued'").get(id) as { n: number }
-  ).n;
-  const activeRewards = (db.prepare("SELECT COUNT(*) AS n FROM rewards WHERE business_id = ? AND active = 1").get(id) as { n: number }).n;
-  const returning = (
-    db.prepare(
-      `SELECT COUNT(*) AS n FROM (SELECT customer_id FROM purchases WHERE business_id = ? AND status = 'verified'
-         GROUP BY customer_id HAVING COUNT(*) >= 2)`,
-    ).get(id) as { n: number }
-  ).n;
+  const since30 = db.daysAgo(30);
+  const members = (await db.prepare("SELECT COUNT(*) AS n FROM business_customers WHERE business_id = ?").get<{ n: number }>(id))?.n ?? 0;
+  const newMembers =
+    (await db
+      .prepare(`SELECT COUNT(*) AS n FROM business_customers WHERE business_id = ? AND joined_at >= ${since30}`)
+      .get<{ n: number }>(id))?.n ?? 0;
+  const purchases =
+    (await db
+      .prepare(
+        `SELECT COUNT(*) AS n, COALESCE(SUM(amount_paise),0) AS amount
+           FROM purchases WHERE business_id = ? AND status = 'verified' AND created_at >= ${since30}`,
+      )
+      .get<{ n: number; amount: number }>(id)) ?? { n: 0, amount: 0 };
+  const issued =
+    (await db
+      .prepare(`SELECT COALESCE(SUM(delta),0) AS n FROM ledger WHERE business_id = ? AND delta > 0 AND created_at >= ${since30}`)
+      .get<{ n: number }>(id))?.n ?? 0;
+  const redeemed =
+    (await db
+      .prepare(`SELECT COALESCE(SUM(-delta),0) AS n FROM ledger WHERE business_id = ? AND kind = 'redeem' AND created_at >= ${since30}`)
+      .get<{ n: number }>(id))?.n ?? 0;
+  const openVouchers =
+    (await db.prepare("SELECT COUNT(*) AS n FROM redemptions WHERE business_id = ? AND status = 'issued'").get<{ n: number }>(id))?.n ?? 0;
+  const activeRewards =
+    (await db.prepare("SELECT COUNT(*) AS n FROM rewards WHERE business_id = ? AND active = 1").get<{ n: number }>(id))?.n ?? 0;
+  const returning =
+    (await db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM (SELECT customer_id FROM purchases WHERE business_id = ? AND status = 'verified'
+           GROUP BY customer_id HAVING COUNT(*) >= 2) t`,
+      )
+      .get<{ n: number }>(id))?.n ?? 0;
 
-  const recent = db
+  const recent = await db
     .prepare(
-      `SELECT p.id, p.amount_paise AS amountPaise, p.points_awarded AS pointsAwarded, p.status, p.created_at AS createdAt,
-              u.name AS customerName
+      `SELECT p.id, p.amount_paise AS "amountPaise", p.points_awarded AS "pointsAwarded", p.status, p.created_at AS "createdAt",
+              u.name AS "customerName"
          FROM purchases p JOIN users u ON u.id = p.customer_id
         WHERE p.business_id = ? ORDER BY p.id DESC LIMIT 6`,
     )
-    .all(id) as Array<{ id: number; amountPaise: number; pointsAwarded: number; status: string; createdAt: string; customerName: string }>;
+    .all<{ id: number; amountPaise: number; pointsAwarded: number; status: string; createdAt: string; customerName: string }>(id);
 
   const pending = openVouchers;
 
@@ -59,13 +65,13 @@ export default async function OverviewPage() {
     const start = new Date(now - i * 7 * 86400000);
     weeks.push({ label: start.toLocaleDateString("en-IN", { day: "numeric", month: "short" }), purchases: 0, members: 0 });
   }
-  const since = new Date(now - 8 * 7 * 86400000).toISOString().slice(0, 19).replace("T", " ");
-  const purchaseRows = db
-    .prepare("SELECT created_at AS at FROM purchases WHERE business_id = ? AND status = 'verified' AND created_at >= ?")
-    .all(id, since) as Array<{ at: string }>;
-  const memberRows = db
-    .prepare("SELECT joined_at AS at FROM business_customers WHERE business_id = ? AND joined_at >= ?")
-    .all(id, since) as Array<{ at: string }>;
+  const since = db.daysAgo(56);
+  const purchaseRows = await db
+    .prepare(`SELECT created_at AS at FROM purchases WHERE business_id = ? AND status = 'verified' AND created_at >= ${since}`)
+    .all<{ at: string }>(id);
+  const memberRows = await db
+    .prepare(`SELECT joined_at AS at FROM business_customers WHERE business_id = ? AND joined_at >= ${since}`)
+    .all<{ at: string }>(id);
   const bucket = (at: string) => {
     const days = (now - new Date(at.replace(" ", "T") + "Z").getTime()) / 86400000;
     return 7 - Math.min(7, Math.max(0, Math.floor(days / 7)));
@@ -73,14 +79,15 @@ export default async function OverviewPage() {
   for (const row of purchaseRows) weeks[bucket(row.at)].purchases += 1;
   for (const row of memberRows) weeks[bucket(row.at)].members += 1;
 
-  const topCustomer = db
+  const topCustomer = await db
     .prepare(
       `SELECT u.id, u.name, COALESCE(SUM(l.delta),0) AS balance FROM business_customers bc
          JOIN users u ON u.id = bc.user_id
          LEFT JOIN ledger l ON l.customer_id = u.id AND l.business_id = bc.business_id
         WHERE bc.business_id = ? GROUP BY u.id ORDER BY balance DESC LIMIT 1`,
     )
-    .get(id) as { id: number; name: string; balance: number } | undefined;
+    .get<{ id: number; name: string; balance: number }>(id);
+  const topBalance = topCustomer ? await getBalance(db, id, topCustomer.id) : 0;
 
   const returningRate = members ? Math.round((returning / members) * 100) : 0;
 
@@ -159,7 +166,7 @@ export default async function OverviewPage() {
                 <div className="mt-2 flex justify-between gap-3">
                   <span className="text-muted">Top balance</span>
                   <Link href={`/biz/customers/${topCustomer.id}`} className="truncate font-semibold hover:underline">
-                    {topCustomer.name} · {points(getBalance(db, id, topCustomer.id))}
+                    {topCustomer.name} · {points(topBalance)}
                   </Link>
                 </div>
               ) : null}

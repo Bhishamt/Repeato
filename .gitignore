@@ -10,3 +10,4 @@ tsconfig.tsbuildinfo
 test-results/
 playwright-report/
 .qa/
+.pgdata/

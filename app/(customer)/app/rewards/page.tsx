@@ -38,32 +38,33 @@ export default async function RewardsPage({
   const query = await searchParams;
   const db = getDb();
 
-  const memberships = db
+  const memberships = await db
     .prepare(
       `SELECT b.id, b.name, b.slug, b.brand_color AS brandColor, b.min_redeem_points AS minRedeemPoints
          FROM business_customers bc JOIN businesses b ON b.id = bc.business_id
         WHERE bc.user_id = ? AND b.status = 'active'
         ORDER BY b.name`,
     )
-    .all(user.id) as Membership[];
+    .all<Membership>(user.id);
 
   const selected = query.b ? memberships.find((m) => m.slug === query.b) : null;
   const shown = selected ? [selected] : memberships;
 
-  const groups = shown.map((m) => {
-    const balance = getBalance(db, m.id, user.id);
-    const rewards = db
+  const groups = [];
+  for (const m of shown) {
+    const balance = await getBalance(db, m.id, user.id);
+    const rewards = await db
       .prepare(
-        `SELECT r.id, r.business_id AS businessId, r.name, r.description, r.points_cost AS pointsCost, r.stock,
-                r.per_customer_limit AS perCustomerLimit, r.valid_until AS validUntil,
+        `SELECT r.id, r.business_id AS "businessId", r.name, r.description, r.points_cost AS "pointsCost", r.stock,
+                r.per_customer_limit AS "perCustomerLimit", r.valid_until AS "validUntil",
                 (SELECT COUNT(*) FROM redemptions rd WHERE rd.reward_id = r.id AND rd.customer_id = ? AND rd.status <> 'cancelled') AS used
            FROM rewards r
           WHERE r.business_id = ? AND r.active = 1
           ORDER BY r.points_cost ASC`,
       )
-      .all(user.id, m.id) as Reward[];
-    return { membership: m, balance, rewards };
-  });
+      .all<Reward>(user.id, m.id);
+    groups.push({ membership: m, balance, rewards });
+  }
 
   return (
     <div className="space-y-5">

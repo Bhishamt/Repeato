@@ -18,7 +18,7 @@ export default async function CustomerHome({
   const query = await searchParams;
   const db = getDb();
 
-  const memberships = db
+  const memberships = await db
     .prepare(
       `SELECT b.id, b.name, b.slug, b.category, b.city, b.brand_color AS brandColor, b.points_per_100 AS pointsPer100,
               b.min_purchase_paise AS minPurchasePaise, b.signup_bonus AS signupBonus, b.min_redeem_points AS minRedeemPoints,
@@ -26,46 +26,50 @@ export default async function CustomerHome({
          FROM business_customers bc JOIN businesses b ON b.id = bc.business_id
         WHERE bc.user_id = ? ORDER BY b.name`,
     )
-    .all(user.id) as Array<{
+    .all<{
     id: number; name: string; slug: string; category: string; city: string | null; brandColor: string;
     pointsPer100: number; minPurchasePaise: number; signupBonus: number; minRedeemPoints: number; maxPointsPerTxn: number;
     status: string; joinedAt: string;
-  }>;
+  }>(user.id);
 
-  const wallets = memberships.map((b) => {
-    const balance = getBalance(db, b.id, user.id);
-    const rewards = db
-      .prepare("SELECT id, name, points_cost AS pointsCost FROM rewards WHERE business_id = ? AND active = 1 ORDER BY points_cost")
-      .all(b.id) as Array<{ id: number; name: string; pointsCost: number }>;
-    const issued = db
-      .prepare("SELECT COUNT(*) AS n FROM redemptions WHERE business_id = ? AND customer_id = ? AND status = 'issued'")
-      .get(b.id, user.id) as { n: number };
-    return { ...b, balance, next: nextRewardProgress(balance, rewards), rewards, issued: issued.n };
-  });
+  const wallets = [];
+  for (const b of memberships) {
+    const balance = await getBalance(db, b.id, user.id);
+    const rewards = await db
+      .prepare("SELECT id, name, points_cost AS \"pointsCost\" FROM rewards WHERE business_id = ? AND active = 1 ORDER BY points_cost")
+      .all<{ id: number; name: string; pointsCost: number }>(b.id);
+    const issued =
+      (await db
+        .prepare("SELECT COUNT(*) AS n FROM redemptions WHERE business_id = ? AND customer_id = ? AND status = 'issued'")
+        .get<{ n: number }>(b.id, user.id))?.n ?? 0;
+    wallets.push({ ...b, balance, next: nextRewardProgress(balance, rewards), rewards, issued });
+  }
 
-  const recent = db
+  const recent = await db
     .prepare(
       `SELECT l.id, l.delta, l.kind, l.note, l.created_at AS createdAt, b.name AS businessName, b.slug AS businessSlug
          FROM ledger l JOIN businesses b ON b.id = l.business_id
         WHERE l.customer_id = ? ORDER BY l.id DESC LIMIT 8`,
     )
-    .all(user.id) as Array<{ id: number; delta: number; kind: string; note: string | null; createdAt: string; businessName: string; businessSlug: string }>;
+    .all<{ id: number; delta: number; kind: string; note: string | null; createdAt: string; businessName: string; businessSlug: string }>(user.id);
 
-  const vouchers = db
+  const vouchers = await db
     .prepare(
       `SELECT r.token, r.expires_at AS expiresAt, rw.name AS rewardName, b.name AS businessName
          FROM redemptions r JOIN rewards rw ON rw.id = r.reward_id JOIN businesses b ON b.id = r.business_id
         WHERE r.customer_id = ? AND r.status = 'issued' ORDER BY r.id DESC LIMIT 3`,
     )
-    .all(user.id) as Array<{ token: string; expiresAt: string; rewardName: string; businessName: string }>;
+    .all<{ token: string; expiresAt: string; rewardName: string; businessName: string }>(user.id);
 
   const totalPoints = wallets.reduce((sum, w) => sum + w.balance, 0);
-  const totalRedeemed = db
-    .prepare("SELECT COALESCE(SUM(-delta), 0) AS n FROM ledger WHERE customer_id = ? AND kind = 'redeem'")
-    .get(user.id) as { n: number };
-  const visits = db
-    .prepare("SELECT COUNT(*) AS n FROM purchases WHERE customer_id = ? AND status = 'verified'")
-    .get(user.id) as { n: number };
+  const totalRedeemed =
+    (await db
+      .prepare("SELECT COALESCE(SUM(-delta), 0) AS n FROM ledger WHERE customer_id = ? AND kind = 'redeem'")
+      .get<{ n: number }>(user.id))?.n ?? 0;
+  const visits =
+    (await db
+      .prepare("SELECT COUNT(*) AS n FROM purchases WHERE customer_id = ? AND status = 'verified'")
+      .get<{ n: number }>(user.id))?.n ?? 0;
 
   return (
     <div className="space-y-6">
@@ -86,8 +90,8 @@ export default async function CustomerHome({
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Points in wallet" value={points(totalPoints)} sub="across all cafés" />
         <Stat label="Cafés joined" value={wallets.length} sub="separate balances" />
-        <Stat label="Verified visits" value={visits.n} sub="all time" />
-        <Stat label="Points redeemed" value={points(totalRedeemed.n)} sub="turned into rewards" />
+        <Stat label="Verified visits" value={visits} sub="all time" />
+        <Stat label="Points redeemed" value={points(totalRedeemed)} sub="turned into rewards" />
       </div>
 
       {vouchers.length ? (

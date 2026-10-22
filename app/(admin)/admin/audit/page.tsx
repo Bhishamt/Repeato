@@ -7,7 +7,7 @@ export const metadata = { title: "Audit log" };
 
 export default async function AuditPage() {
   await requireAdmin("/admin/audit");
-  const rows = getDb()
+  const rows = await getDb()
     .prepare(
       `SELECT a.id, a.action, a.entity, a.entity_id AS entityId, a.meta, a.created_at AS createdAt,
               u.email AS actor, b.name AS businessName
@@ -16,10 +16,10 @@ export default async function AuditPage() {
          LEFT JOIN businesses b ON b.id = a.business_id
         ORDER BY a.id DESC LIMIT 200`,
     )
-    .all() as Array<{
+    .all<{
     id: number; action: string; entity: string; entityId: number | null; meta: string | null; createdAt: string;
     actor: string | null; businessName: string | null;
-  }>;
+  }>();
 
   return (
     <div className="space-y-5">

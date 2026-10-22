@@ -20,12 +20,12 @@ export type ConsoleContext = {
  */
 export async function consoleContext(): Promise<ConsoleContext> {
   const user = await requireBusinessUser("/biz");
-  const memberships = membershipsFor(user.id);
+  const memberships = await membershipsFor(user.id);
   if (memberships.length === 0) redirect("/onboarding");
 
   const requested = Number((await cookies()).get(BUSINESS_COOKIE)?.value);
-  const active = activeMembership(user.id, Number.isInteger(requested) ? requested : undefined) ?? memberships[0];
-  const business = getBusiness(getDb(), active.businessId);
+  const active = (await activeMembership(user.id, Number.isInteger(requested) ? requested : undefined)) ?? memberships[0];
+  const business = await getBusiness(getDb(), active.businessId);
   if (!business) redirect("/biz/onboarding");
 
   return { user, memberships, active, role: active.role, business };
