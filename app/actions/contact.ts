@@ -23,8 +23,8 @@ export async function sendContactMessage(formData: FormData) {
     redirect("/contact?error=" + encodeURIComponent("Add your name, a valid email, and a message of at least 10 characters."));
   }
   const { name, email, business, message } = parsed.data;
-  if (!(await rateLimit(`contact:${email}`, 3, 60 * 60 * 1000))) {
-    redirect("/contact?error=" + encodeURIComponent("That email has sent several messages already. Try again later."));
+  if (!(await rateLimit(`contact:${email}`, 3, 60 * 60 * 1000, { failClosed: true }))) {
+    redirect("/contact?error=" + encodeURIComponent("That email has sent several messages already or service is busy. Try again later."));
   }
 
   const db = getDb();

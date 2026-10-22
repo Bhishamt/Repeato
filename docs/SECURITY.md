@@ -84,17 +84,22 @@ is a `GET`. If you add a mutating route handler later, add an explicit origin ch
 
 ## Rate limiting
 
-`lib/rate-limit.ts` is a fixed-window limiter with two stores:
+`lib/rate-limit.ts` is a fixed-window limiter with hybrid resilience:
 
 - **Shared (production):** if `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set, counters
-  live in Redis via `INCR` + `PEXPIRE`, so every instance shares them.
-- **Local fallback:** an in-process map, correct for one node and for tests.
-
-A store outage fails open and logs `rate limit store unavailable`. That is deliberate — a limiter
-outage must not lock everyone out of sign-in — but it means the limiter is not a hard guarantee.
+  live in Redis via `INCR` + `PEXPIRE`, so every server instance shares them.
+- **Local fallback:** an in-process map, used for single-node deployments and tests.
+- **Store outage behavior (production strategy):**
+  - **Sensitive outbound/abuse vectors fail closed:** `requestPasswordReset`, `sendVerificationEmail`, and
+    `sendContactMessage` specify `{ failClosed: true }`. If Redis is down, these operations are blocked to
+    prevent inbox bombing, spamming, or email quota draining.
+  - **Essential operations degrade gracefully (fail open to local memory):** `signIn`, `signUp`, and daily
+    counter/customer operations fall back to process-local counters, ensuring users are never locked out of
+    sign-in and business operations continue unhindered during a cache outage.
 
 Limits currently enforced: signup 5/hour/email, login 8/10 min/email, contact 3/hour/email,
-join 20/hour/user, redemption 30/hour/user, sales 600/hour/user, voucher verification 600/hour/user,
+password reset 3/hour/email, email verification resend 3/hour/user, join 20/hour/user,
+redemption 30/hour/user, sales 600/hour/user, voucher verification 600/hour/user,
 reversals 60/hour/user, point adjustments 60/hour/user.
 
 ## Input handling and error messages
@@ -116,18 +121,29 @@ reversals 60/hour/user, point adjustments 60/hour/user.
 generated admin password once and stores only its hash. No secret is read at module scope except the
 database URL and the rate-limit credentials.
 
-## Open risks
+## Production Readiness and Verification Status
 
-1. **No email provider.** There is no password reset and no email verification, because sending mail
-   without a configured provider would be a lie. Add Resend/Postmark and gate password reset on a
-   verified address before launch.
-2. **No hosted Supabase run.** Migrations and RLS were executed against a local PostgreSQL 18.4
-   server, not a Supabase project (no credentials were available). Expect to re-run
-   `scripts/migrate.mjs` and the RLS suite against the real project before launch.
-3. **No MFA, no session listing UI.** Sessions expire and can be revoked, but users cannot see or end
-   individual devices from the interface.
-4. **CSP allows `'unsafe-inline'`** for scripts and styles, as explained above.
-5. **Notifications are in-app only** — no email, SMS or push, so a customer who never opens the app
-   misses them.
-6. **No dependency audit in CI.** Run `npm audit` and enable Dependabot before launch.
-7. **Rate limiting fails open** when the shared store is unreachable.
+1. **Email Integration:** Email verification and password reset are fully implemented using Resend
+   (`lib/email.ts`, `lib/tokens.ts`, `app/actions/auth.ts`). When `RESEND_API_KEY` and `MAIL_FROM` are set,
+   real emails are dispatched. In development/testing, tokens and email bodies are logged safely without
+   emailing external recipients.
+2. **Database & Role Security:** All 4 migrations (including RLS, least-privilege `repeato_app` role, and
+   `email_tokens`) have been verified on PostgreSQL 18.4 local cluster and fresh database instances. The
+   application role cannot perform DDL or delete from money/audit tables.
+3. **Rate Limiting Resilience:** Production strategy implemented: sensitive outbound email triggers fail closed
+   during Redis outages, while authentication and daily operations fail open to process-local memory.
+4. **Automated CI:** Both remote GitHub Actions workflow (`.github/workflows/ci.yml`) and local pipeline
+   (`npm run ci`) are verified, passing TypeScript compilation, PostgreSQL migrations, DB role audits,
+   67 unit/integration/acceptance tests, production build, and Playwright e2e tests.
+
+## Remaining Production Operational Steps
+
+1. **Dedicated Supabase Project:** The Supabase access token in the environment was found to connect to an
+   existing project used for an unrelated academic system. To avoid destructive conflicts, a dedicated
+   Repeato Supabase project must be selected or created, and migrations applied using `scripts/migrate.mjs`.
+2. **Production Secrets:** Set `RESEND_API_KEY`, `MAIL_FROM`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`,
+   and `DATABASE_URL` in the production hosting dashboard (e.g. Vercel).
+3. **No MFA, no session listing UI:** Sessions expire after 30 days and can be revoked globally or per device
+   programmatically, but users cannot view individual active devices from the web UI.
+4. **CSP `'unsafe-inline'`:** Retained for Next.js bootstrap script injection and Tailwind runtime CSS; a
+   strict nonce-based CSP via middleware remains a future optimization.

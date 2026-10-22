@@ -131,8 +131,8 @@ export async function changePassword(formData: FormData) {
 
 export async function requestPasswordReset(formData: FormData) {
   const mail = parseEmail(formData.get("email"));
-  if (!(await rateLimit(`reset:${mail ?? "invalid"}`, 3, 60 * 60 * 1000))) {
-    fail("/forgot", "Too many reset requests. Try again later.");
+  if (!(await rateLimit(`reset:${mail ?? "invalid"}`, 3, 60 * 60 * 1000, { failClosed: true }))) {
+    fail("/forgot", "Too many reset requests or service busy. Try again later.");
   }
 
   if (mail) {
@@ -194,8 +194,8 @@ export async function sendVerificationEmail(formData: FormData) {
   const db = getDb();
   const row = await db.prepare("SELECT email_verified AS verified FROM users WHERE id = ?").get<{ verified: number }>(user.id);
   if (row?.verified === 1) redirect(withQuery(back, "ok", "Your email is already confirmed."));
-  if (!(await rateLimit(`verify-send:${user.id}`, 3, 60 * 60 * 1000))) {
-    fail(back, "A confirmation email was sent recently. Check your inbox.");
+  if (!(await rateLimit(`verify-send:${user.id}`, 3, 60 * 60 * 1000, { failClosed: true }))) {
+    fail(back, "A confirmation email was sent recently or service busy. Check your inbox.");
   }
 
   await sendVerificationEmailFor(db, user.id, user.email, user.name);

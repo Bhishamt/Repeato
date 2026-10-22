@@ -23,7 +23,7 @@ export function createPostgresDb(connectionString = process.env.DATABASE_URL as 
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
     application_name: "repeato",
-    ssl: process.env.PG_SSL === "disable" ? false : undefined,
+    ssl: process.env.PG_SSL === "disable" ? false : process.env.PG_SSL === "no-verify" ? { rejectUnauthorized: false } : undefined,
   });
 
   type Runner = { query: (text: string, values?: unknown[]) => Promise<pg.QueryResult> };

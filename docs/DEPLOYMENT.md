@@ -4,7 +4,7 @@ Repeato runs on two database engines behind one interface (`lib/db.ts`):
 
 | Engine | Driver | Use |
 | --- | --- | --- |
-| SQLite (`DATABASE_PATH`) | `better-sqlite3` | local development, tests, single-node hosting |
+| SQLite (`DATABASE_PATH`) | `better-sqlite3` (lazy-loaded) | local development, tests, single-node hosting |
 | PostgreSQL (`DATABASE_URL`) | `pg` pool | Supabase, Neon, RDS, any managed Postgres |
 
 Pick one with environment variables — nothing else in the code changes. Money is stored as integer
@@ -12,19 +12,23 @@ paise and points as integers on both engines.
 
 ## Environment variables
 
-| Variable | Required | Notes |
+| Variable | Required | Purpose |
 | --- | --- | --- |
-| `DATABASE_URL` | production | `postgres://...` — takes priority over `DATABASE_PATH` |
+| `DATABASE_URL` | production | `postgres://repeato_app:...@...:6543/postgres?sslmode=require` |
 | `DATABASE_PATH` | local | defaults to `./data/repeato.db`; `:memory:` for throwaway runs |
-| `APP_URL` | production | canonical origin used in QR codes, no trailing slash |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | seed only | blank password prints a random one once |
-| `DEMO_PASSWORD` | seed only | password for the demo accounts |
-| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | production | shared rate-limit store; without them limits are per-process |
-| `PG_TEST_URL` | CI | database used by the RLS suite |
+| `APP_URL` | production | canonical origin used in QR codes, emails, no trailing slash |
+| `RESEND_API_KEY` | production | Resend API key for verification & password reset emails |
+| `MAIL_FROM` | production | Sender address (e.g. `Repeato <no-reply@yourdomain.com>`) |
+| `UPSTASH_REDIS_REST_URL` | production | Upstash Redis REST URL for distributed rate limiting |
+| `UPSTASH_REDIS_REST_TOKEN` | production | Upstash Redis REST bearer token |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | seed only | Initial platform admin credentials |
+| `PG_POOL_MAX` | optional | Max database connections per instance (default: 10, set to 2 for serverless) |
+| `PG_SSL` | optional | SSL mode: `require`, `no-verify`, or `disable` |
+| `ADMIN_DATABASE_URL` | setup only | Direct postgres connection (port 5432) for migrations and role provisioning |
 
 Never commit real values. `.env` is gitignored; `.env.example` documents the shape.
 
-## Option A — single Node host (SQLite, works today)
+## Option A — single Node host (SQLite, container with volume)
 
 ```bash
 npm ci
@@ -32,68 +36,82 @@ npm run build
 npm start          # :3000
 ```
 
-Needs a persistent disk (Fly volume, VPS, container with a volume). Not suitable for Vercel
+Needs a persistent disk (Fly volume, VPS, container with persistent volume). Not suitable for Vercel
 Functions, which have an ephemeral filesystem and no single-writer guarantee.
 
-## Option B — managed PostgreSQL (Supabase, recommended for production)
+## Option B — managed PostgreSQL (Supabase / Vercel)
 
-1. Create a Supabase project and copy the connection string. Use the **pooled** connection string
-   (port `6543`, `?pgbouncer=true`) for the app and the direct one (port `5432`) for migrations.
-2. Apply the schema and the RLS policies in order:
+### 1. Provision a Dedicated Supabase Project
+1. In the Supabase Dashboard, create a dedicated project for Repeato.
+2. Under **Project Settings > Database**, note:
+   - Direct connection string (`db.<ref>.supabase.co:5432/postgres`)
+   - Transaction pooler string (`<pooler-host>:6543/postgres?pgbouncer=true`)
 
-   ```bash
-   DATABASE_URL="postgres://...:5432/postgres" node scripts/migrate.mjs
-   ```
+### 2. Apply Migrations (as Database Admin)
+Connect directly as `postgres` on port 5432 to execute DDL and role creation:
 
-   `scripts/migrate.mjs` applies every file in `supabase/migrations/` in filename order and records
-   them in `schema_migrations`, so re-running it is safe.
-3. Create the platform admin (seed skips demo data when `NODE_ENV=production`):
+```bash
+DATABASE_URL="postgres://postgres:<admin_password>@db.<ref>.supabase.co:5432/postgres" node scripts/migrate.mjs
+```
 
-   ```bash
-   NODE_ENV=production DATABASE_URL="postgres://...:6543/postgres" ADMIN_EMAIL=you@example.com npm run seed
-   ```
+`scripts/migrate.mjs` applies every migration in order:
+- `0001_init.sql` — Tables, foreign keys, check constraints, indexes, views.
+- `0002_rls.sql` — RLS policies and JWT helper functions for public/authenticated roles.
+- `0003_app_role.sql` — Creates least-privilege `repeato_app` role without DDL or delete privileges on financial tables.
+- `0004_email_tokens.sql` — Single-use verification and password reset tokens table.
 
-4. Deploy the app with `DATABASE_URL` set, plus `APP_URL` and the Upstash pair.
-5. Run the smoke tests in `## Post-deploy smoke test`.
+### 3. Set Application Role Password
+Set a secure generated password for the `repeato_app` role:
 
-### About RLS on Supabase
+```sql
+ALTER ROLE repeato_app PASSWORD '<generate_strong_password>';
+```
 
-`supabase/migrations/0002_rls.sql` enables row-level security on every table and defines policies
-that read the caller from `request.jwt.claims`. That is what the Supabase PostgREST layer uses.
+Verify that the role cannot alter the schema or delete audit/ledger records:
 
-**The Next.js app connects as the database owner, so RLS does not apply to it.** Its isolation comes
-from `lib/services.ts`, which scopes every query by `business_id` and re-checks membership with
-`requireMember` before each write. RLS is the second line of defence for any future client that talks
-to Supabase directly (PostgREST, a mobile app, an edge function). Keep both: the RLS suite in
-`test/pg-rls.test.ts` proves the policies, and the service layer proves the app.
+```bash
+ADMIN_DATABASE_URL="postgres://postgres:<admin_password>@db.<ref>.supabase.co:5432/postgres" \
+APP_DB_USER="repeato_app" \
+APP_DB_PASSWORD="<generate_strong_password>" \
+node scripts/verify-db-role.mjs
+```
 
-If you later expose Supabase directly to browsers, create a separate `authenticated` role login
-instead of connecting as the owner, or the policies will never run.
+### 4. Seed Platform Admin
+```bash
+NODE_ENV=production \
+DATABASE_URL="postgres://repeato_app:<password>@<pooler-host>:6543/postgres?sslmode=require" \
+ADMIN_EMAIL=admin@yourdomain.com \
+npm run seed
+```
 
-## Migrations
+### 5. Configure Hosting (e.g. Vercel)
+Set the environment variables in your hosting dashboard:
+- `DATABASE_URL`: `postgres://repeato_app:<password>@<pooler-host>:6543/postgres?sslmode=require`
+- `APP_URL`: `https://yourdomain.com`
+- `RESEND_API_KEY`: `re_...`
+- `MAIL_FROM`: `Repeato <no-reply@yourdomain.com>`
+- `UPSTASH_REDIS_REST_URL`: `https://...upstash.io`
+- `UPSTASH_REDIS_REST_TOKEN`: `...`
+- `NODE_ENV`: `production`
 
-`supabase/migrations/` is the single source of truth for the Postgres schema:
+> [!NOTE]
+> Serverless platforms like Vercel re-instantiate containers on demand. The database adapter uses `pg` with pool limits and lazy loads `better-sqlite3` only in SQLite mode, ensuring full compatibility with serverless Linux runtimes.
 
-- `0001_init.sql` — tables, constraints, indexes. Boolean-ish columns (`products.available`,
-  `products.archived`, `rewards.active`) are `integer` with a `check (col in (0, 1))` so the same SQL
-  runs on SQLite and Postgres.
-- `0002_rls.sql` — helper functions (`is_admin`, `is_member`, `owns`, `is_customer`,
-  `business_is_active`, `has_no_members`) and the policies.
+## Automated CI Pipeline
 
-To change the schema: add `0003_*.sql`, run `node scripts/migrate.mjs`, then mirror the change in
-`lib/schema.ts` (the SQLite bootstrap) so local development stays in step. The test suite runs
-against both engines, so a missed mirror shows up immediately.
+Both local and remote CI pipelines are available:
+- **Remote CI (GitHub Actions)**: `.github/workflows/ci.yml` runs clean `npm ci`, typecheck, Postgres migrations against a Docker service container, DB role checks, Vitest tests, Next.js production build, and Playwright e2e tests.
+- **Local CI runner**: Run `npm run ci` locally anytime to execute all checks in sequence with detailed timings and verification.
 
-## Backups and recovery
+## Backups and Recovery
 
-- Supabase: enable Point-in-Time Recovery on the paid tier; otherwise take a nightly `pg_dump` and
-  store it off-platform. Test a restore before launch — an untested backup is a guess.
-- The ledger is append-only by design (`ledger` rows are never updated or deleted; corrections are
-  new rows with `kind = 'adjust'` or `'reverse'`). A restored dump therefore reproduces balances
-  exactly: `balance = SUM(delta)`.
-- `purchases.idempotency_key` is unique, so a replayed import cannot double-award points.
+- **Supabase PITR**: Enable Point-in-Time Recovery on the project.
+- **Append-Only Ledger**: Balances are calculated as `SUM(ledger.delta)`. The ledger is append-only, and corrections are made via `adjust` or `reverse` transactions. Replay and restore reproduce points balances exactly.
+- **Idempotency**: All purchases carry an `idempotency_key` unique constraint, preventing double-credits on retry or network hiccups.
 
-## Post-deploy smoke test
+## Post-Deploy Smoke Test
+
+Run the following checks against your live production domain:
 
 ```bash
 curl -sS -o /dev/null -w '%{http_code}\n' "$APP_URL/"            # 200
@@ -101,23 +119,11 @@ curl -sS -o /dev/null -w '%{http_code}\n' "$APP_URL/biz"         # 307 -> /login
 curl -sS -o /dev/null -w '%{http_code}\n' "$APP_URL/join/<slug>" # 200
 ```
 
-Then, in a browser: join a business through `/join/<slug>`, record a sale in `/biz/transactions`,
-redeem a reward, verify the voucher once in `/biz/redemptions`, and confirm the second attempt is
-rejected. That is the whole money path.
-
-## Production checklist
-
-- [ ] `DATABASE_URL` points at pooled Postgres; migrations applied
-- [ ] `APP_URL` is the real HTTPS origin (QR codes embed it)
-- [ ] Upstash credentials set, so rate limits are shared across instances
-- [ ] `NODE_ENV=production` (enables `Secure` cookies and HSTS)
-- [ ] Admin account created and the demo seed skipped
-- [ ] Nightly backup scheduled and one restore rehearsed
-- [ ] Uptime check on `/` and on one authenticated route
-- [ ] Email provider connected before promising password reset (not implemented yet)
-
-## What is not automated
-
-There is no CI pipeline in this repository and no deploy has been executed — no hosting or Supabase
-credentials were available. `npm run typecheck`, `npm test`, `npx playwright test` and `npm run build`
-are the gates to wire into CI in that order.
+Browser verification steps:
+1. Scan QR code / visit `/join/<slug>` and join.
+2. Verify signup bonus appears in customer wallet.
+3. Sign in as business staff/owner in `/biz/transactions` and record a sale.
+4. Confirm points awarded correctly to customer wallet.
+5. In `/app/rewards`, redeem a reward to generate an 8-character voucher code.
+6. In `/biz/redemptions`, enter voucher code and verify. Confirm status changes to redeemed.
+7. Attempt verifying the same voucher a second time; confirm it is immediately rejected as already redeemed.

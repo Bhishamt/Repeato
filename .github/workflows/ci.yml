@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  verify:
+    name: Verify, Test & Build
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: repeato_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install dependencies (clean lockfile install)
+        run: npm ci
+
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Apply database migrations to isolated PostgreSQL
+        env:
+          DATABASE_URL: postgres://postgres:postgrespassword@localhost:5432/repeato_ci
+        run: node scripts/migrate.mjs --local
+
+      - name: Verify least-privilege database role
+        env:
+          ADMIN_DATABASE_URL: postgres://postgres:postgrespassword@localhost:5432/repeato_ci
+        run: node scripts/verify-db-role.mjs
+
+      - name: Run unit, integration and RLS tests
+        env:
+          PG_TEST_URL: postgres://postgres:postgrespassword@localhost:5432/repeato_ci
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright smoke tests
+        run: npx playwright test
+
+      - name: Upload Playwright test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

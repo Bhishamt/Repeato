@@ -1,8 +1,10 @@
-import Database from "better-sqlite3";
+import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Db, RunResult, Statement } from "../db";
 import { SCHEMA } from "../schema";
+
+const require = createRequire(import.meta.url);
 
 /**
  * SQLite driver: one connection, synchronous under the hood, exposed through the
@@ -12,6 +14,7 @@ import { SCHEMA } from "../schema";
  */
 export function createSqliteDb(path = ":memory:", schema = SCHEMA): Db {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
+  const Database = require("better-sqlite3");
   const handle = new Database(path);
   handle.pragma("foreign_keys = ON");
   handle.pragma("journal_mode = WAL");

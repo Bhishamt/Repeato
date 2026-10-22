@@ -2,7 +2,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createHash, randomBytes } from "node:crypto";
-import { getDb } from "./db";
+import { getDb, type Db } from "./db";
 import { hashPassword, verifyPassword } from "./password";
 
 export { hashPassword, verifyPassword };
@@ -55,8 +55,8 @@ export async function endSession() {
 }
 
 /** Signs every device out of an account (password change, suspension, admin action). */
-export async function revokeUserSessions(userId: number) {
-  await getDb().prepare("DELETE FROM sessions WHERE user_id = ?").run(userId);
+export async function revokeUserSessions(userId: number, customDb?: Db) {
+  await (customDb ?? getDb()).prepare("DELETE FROM sessions WHERE user_id = ?").run(userId);
 }
 
 /** Expired rows are pruned opportunistically; there is no cron dependency. */
