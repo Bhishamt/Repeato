@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { calculatePoints, nextRewardProgress } from "../lib/points";
+import {
+  calculateCustomerTier,
+  calculatePoints,
+  calculatePointsExpiration,
+  calculatePromotionalBonus,
+  calculateTierUpgradeRequirements,
+  getTierPerks,
+  nextRewardProgress,
+} from "../lib/points";
 import { DEFAULT_RULES } from "../lib/db";
 
 const rules = { ...DEFAULT_RULES, minPurchasePaise: 10_000, pointsPer100: 10, maxPointsPerTxn: 500 };
@@ -65,5 +73,122 @@ describe("nextRewardProgress", () => {
   });
   it("handles an empty catalogue", () => {
     expect(nextRewardProgress(10, [])).toBeNull();
+  });
+});
+
+describe("calculateCustomerTier", () => {
+  it("assigns Bronze by default for new or low-activity customers", () => {
+    expect(calculateCustomerTier(0, 0)).toBe("Bronze");
+    expect(calculateCustomerTier(150, 150_000)).toBe("Bronze");
+  });
+
+  it("assigns Silver when points or spend thresholds are reached", () => {
+    expect(calculateCustomerTier(200, 0)).toBe("Silver");
+    expect(calculateCustomerTier(50, 200_000)).toBe("Silver");
+  });
+
+  it("assigns Gold when points or spend reach gold thresholds", () => {
+    expect(calculateCustomerTier(500, 0)).toBe("Gold");
+    expect(calculateCustomerTier(100, 500_000)).toBe("Gold");
+  });
+
+  it("assigns Platinum when points or spend reach top thresholds", () => {
+    expect(calculateCustomerTier(1000, 0)).toBe("Platinum");
+    expect(calculateCustomerTier(250, 1_000_000)).toBe("Platinum");
+  });
+});
+
+describe("getTierPerks", () => {
+  it("returns appropriate benefits and discounts for each tier", () => {
+    expect(getTierPerks("Bronze")).toMatchObject({ discountPercent: 0, pointsMultiplier: 1.0 });
+    expect(getTierPerks("Silver")).toMatchObject({ discountPercent: 5, pointsMultiplier: 1.1 });
+    expect(getTierPerks("Gold")).toMatchObject({ discountPercent: 10, pointsMultiplier: 1.25 });
+    expect(getTierPerks("Platinum")).toMatchObject({ discountPercent: 15, pointsMultiplier: 1.5 });
+  });
+});
+
+describe("calculateTierUpgradeRequirements", () => {
+  it("calculates progression toward Silver for Bronze members", () => {
+    const res = calculateTierUpgradeRequirements(100, 100_000);
+    expect(res).toEqual({
+      currentTier: "Bronze",
+      nextTier: "Silver",
+      pointsNeeded: 100,
+      spendPaiseNeeded: 100_000,
+      progressPercent: 50,
+      isMaxTier: false,
+    });
+  });
+
+  it("calculates progression toward Gold for Silver members", () => {
+    const res = calculateTierUpgradeRequirements(300, 250_000);
+    expect(res).toEqual({
+      currentTier: "Silver",
+      nextTier: "Gold",
+      pointsNeeded: 200,
+      spendPaiseNeeded: 250_000,
+      progressPercent: 60,
+      isMaxTier: false,
+    });
+  });
+
+  it("calculates progression toward Platinum for Gold members", () => {
+    const res = calculateTierUpgradeRequirements(700, 600_000);
+    expect(res).toEqual({
+      currentTier: "Gold",
+      nextTier: "Platinum",
+      pointsNeeded: 300,
+      spendPaiseNeeded: 400_000,
+      progressPercent: 70,
+      isMaxTier: false,
+    });
+  });
+
+  it("handles Platinum members at maximum tier", () => {
+    const res = calculateTierUpgradeRequirements(1500, 1_500_000);
+    expect(res).toEqual({
+      currentTier: "Platinum",
+      nextTier: null,
+      pointsNeeded: 0,
+      spendPaiseNeeded: 0,
+      progressPercent: 100,
+      isMaxTier: true,
+    });
+  });
+});
+
+describe("calculatePromotionalBonus", () => {
+  it("applies points multiplier and flat bonus correctly", () => {
+    expect(calculatePromotionalBonus(100, 2, 0)).toBe(200);
+    expect(calculatePromotionalBonus(100, 1.5, 25)).toBe(175);
+    expect(calculatePromotionalBonus(0, 2, 50)).toBe(50);
+    expect(calculatePromotionalBonus(-10, 2, 0)).toBe(0);
+  });
+});
+
+describe("calculatePointsExpiration", () => {
+  const referenceNow = new Date("2026-10-23T12:00:00Z");
+
+  it("indicates active points well before expiry window", () => {
+    const lastActivity = new Date("2026-08-01T12:00:00Z");
+    const status = calculatePointsExpiration(lastActivity, 365, referenceNow);
+    expect(status.isExpired).toBe(false);
+    expect(status.warningThreshold).toBe(false);
+    expect(status.daysRemaining).toBeGreaterThan(30);
+  });
+
+  it("triggers warning threshold when within 30 days of expiry", () => {
+    const lastActivity = new Date("2025-11-01T12:00:00Z");
+    const status = calculatePointsExpiration(lastActivity, 365, referenceNow);
+    expect(status.isExpired).toBe(false);
+    expect(status.warningThreshold).toBe(true);
+    expect(status.daysRemaining).toBeLessThanOrEqual(30);
+  });
+
+  it("marks points as expired when past retention period", () => {
+    const lastActivity = new Date("2025-01-01T12:00:00Z");
+    const status = calculatePointsExpiration(lastActivity, 365, referenceNow);
+    expect(status.isExpired).toBe(true);
+    expect(status.daysRemaining).toBe(0);
   });
 });
