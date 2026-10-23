@@ -73,6 +73,25 @@ traction.
 - **Business console** with 12 sections: dashboard, transactions, customers, customer detail,
   loyalty rules, menu & categories, rewards, redemptions, QR code, analytics, team, settings.
 - **Admin console**: businesses (approve/suspend), users, audit log, platform overview.
+- **Loyalty tiers & progression.** `lib/points.ts` provides multi-tier tracking (`Bronze`, `Silver`, `Gold`, `Platinum`), perk calculations (discounts and point multipliers), upgrade progress math, promo bonus boosts, and points expiration monitoring with 30-day early warnings.
+
+## Loyalty Tiers & Progression
+
+Repeato supports tiered loyalty mechanics with automated progression tracking:
+
+| Tier | Qualifying Threshold | Member Perks & Benefits |
+| :--- | :--- | :--- |
+| **Bronze** | Baseline (0 - 199 pts / < ₹2,000 spend) | Standard 1 pt per ₹100 spend |
+| **Silver** | 200 pts or ₹2,000 lifetime spend | 5% bill discount + 10% points accelerator |
+| **Gold** | 500 pts or ₹5,000 lifetime spend | 10% bill discount + 25% points accelerator |
+| **Platinum** | 1,000 pts or ₹10,000 lifetime spend | 15% bill discount + 50% points accelerator + priority service |
+
+Key helper utilities exported in [`lib/points.ts`](file:///d:/project/Repeato/lib/points.ts):
+- `calculateCustomerTier(points, spendPaise)`: Computes active member tier.
+- `getTierPerks(tier)`: Returns discount percentage and points accelerator rate.
+- `calculateTierUpgradeRequirements(points, spendPaise)`: Computes remaining points, spend needed, and completion percentage to achieve the next tier.
+- `calculatePromotionalBonus(basePoints, multiplier, flatBonus)`: Calculates bonus points for double-points events and special campaigns.
+- `calculatePointsExpiration(lastActivity, retentionDays)`: Calculates expiry timelines and triggers 30-day proactive warning thresholds.
 
 ## Routes
 
