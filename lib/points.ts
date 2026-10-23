@@ -101,3 +101,158 @@ export function nextRewardProgress(balance: number, rewards: Array<{ id: number;
     percent: Math.min(100, Math.floor((balance / upcoming.pointsCost) * 100)),
   };
 }
+
+export type LoyaltyTier = "Bronze" | "Silver" | "Gold" | "Platinum";
+
+export interface TierUpgradeRequirements {
+  currentTier: LoyaltyTier;
+  nextTier: LoyaltyTier | null;
+  pointsNeeded: number;
+  spendPaiseNeeded: number;
+  progressPercent: number;
+  isMaxTier: boolean;
+}
+
+export interface TierPerks {
+  discountPercent: number;
+  pointsMultiplier: number;
+  description: string;
+}
+
+export interface PointsExpirationStatus {
+  isExpired: boolean;
+  daysRemaining: number;
+  expiryDate: Date;
+  warningThreshold: boolean;
+}
+
+export function calculateCustomerTier(
+  totalPoints: number,
+  lifetimeSpendPaise = 0
+): LoyaltyTier {
+  const safePoints = Math.max(0, totalPoints || 0);
+  const safeSpend = Math.max(0, lifetimeSpendPaise || 0);
+
+  if (safePoints >= 1000 || safeSpend >= 1_000_000) return "Platinum";
+  if (safePoints >= 500 || safeSpend >= 500_000) return "Gold";
+  if (safePoints >= 200 || safeSpend >= 200_000) return "Silver";
+  return "Bronze";
+}
+
+export function getTierPerks(tier: LoyaltyTier): TierPerks {
+  switch (tier) {
+    case "Platinum":
+      return {
+        discountPercent: 15,
+        pointsMultiplier: 1.5,
+        description: "15% bill discount + 50% points accelerator + priority service",
+      };
+    case "Gold":
+      return {
+        discountPercent: 10,
+        pointsMultiplier: 1.25,
+        description: "10% bill discount + 25% points accelerator",
+      };
+    case "Silver":
+      return {
+        discountPercent: 5,
+        pointsMultiplier: 1.1,
+        description: "5% bill discount + 10% points accelerator",
+      };
+    case "Bronze":
+    default:
+      return {
+        discountPercent: 0,
+        pointsMultiplier: 1.0,
+        description: "Standard earning rate (1 pt per ₹100 spend)",
+      };
+  }
+}
+
+export function calculateTierUpgradeRequirements(
+  currentPoints: number,
+  lifetimeSpendPaise = 0
+): TierUpgradeRequirements {
+  const safePoints = Math.max(0, currentPoints || 0);
+  const safeSpend = Math.max(0, lifetimeSpendPaise || 0);
+  const currentTier = calculateCustomerTier(safePoints, safeSpend);
+
+  if (currentTier === "Platinum") {
+    return {
+      currentTier,
+      nextTier: null,
+      pointsNeeded: 0,
+      spendPaiseNeeded: 0,
+      progressPercent: 100,
+      isMaxTier: true,
+    };
+  }
+
+  let nextTier: LoyaltyTier = "Silver";
+  let targetPoints = 200;
+  let targetSpendPaise = 200_000;
+
+  if (currentTier === "Silver") {
+    nextTier = "Gold";
+    targetPoints = 500;
+    targetSpendPaise = 500_000;
+  } else if (currentTier === "Gold") {
+    nextTier = "Platinum";
+    targetPoints = 1000;
+    targetSpendPaise = 1_000_000;
+  }
+
+  const pointsNeeded = Math.max(0, targetPoints - safePoints);
+  const spendPaiseNeeded = Math.max(0, targetSpendPaise - safeSpend);
+
+  const pointsProgress = Math.min(100, Math.floor((safePoints / targetPoints) * 100));
+  const spendProgress = Math.min(100, Math.floor((safeSpend / targetSpendPaise) * 100));
+  const progressPercent = Math.max(pointsProgress, spendProgress);
+
+  return {
+    currentTier,
+    nextTier,
+    pointsNeeded,
+    spendPaiseNeeded,
+    progressPercent,
+    isMaxTier: false,
+  };
+}
+
+export function calculatePromotionalBonus(
+  basePoints: number,
+  multiplier = 1,
+  flatBonus = 0
+): number {
+  if (basePoints <= 0 && flatBonus <= 0) return 0;
+  const safeBase = Math.max(0, basePoints);
+  const safeMultiplier = Math.max(1, multiplier);
+  const safeFlatBonus = Math.max(0, flatBonus);
+  return Math.floor(safeBase * safeMultiplier) + safeFlatBonus;
+}
+
+export function calculatePointsExpiration(
+  lastActivity: string | Date | null | undefined,
+  retentionPeriodDays = 365,
+  currentDate: Date = new Date()
+): PointsExpirationStatus {
+  const baseDate = lastActivity instanceof Date
+    ? lastActivity
+    : lastActivity
+      ? new Date(lastActivity)
+      : new Date();
+
+  const safeDate = Number.isNaN(baseDate.getTime()) ? new Date() : baseDate;
+  const expiryDate = new Date(safeDate.getTime() + retentionPeriodDays * 24 * 60 * 60 * 1000);
+  const msRemaining = expiryDate.getTime() - currentDate.getTime();
+  const daysRemaining = Math.max(0, Math.ceil(msRemaining / (24 * 60 * 60 * 1000)));
+  const isExpired = msRemaining <= 0;
+  const warningThreshold = !isExpired && daysRemaining <= 30;
+
+  return {
+    isExpired,
+    daysRemaining,
+    expiryDate,
+    warningThreshold,
+  };
+}
