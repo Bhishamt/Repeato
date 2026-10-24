@@ -49,3 +49,39 @@ export function relative(value: string): string {
   if (hours < 24) return `${hours}h ago`;
   return dateShort(value);
 }
+
+/** Formats phone number into readable grouped digits (e.g., +91 98765 43210 or 98765 43210). */
+export function formatPhone(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 10) {
+    return `${digits.slice(0, 5)} ${digits.slice(5)}`;
+  }
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
+  }
+  return raw;
+}
+
+/** Truncates text with an ellipsis if it exceeds maxLength. */
+export function truncate(str: string | null | undefined, maxLength: number, suffix = "..."): string {
+  if (!str) return "";
+  if (str.length <= maxLength) return str;
+  return str.slice(0, Math.max(0, maxLength - suffix.length)) + suffix;
+}
+
+/** Formats a percentage value (e.g. 5% or 12.5%). */
+export function percent(value: number, decimals = 0): string {
+  if (!Number.isFinite(value)) return "0%";
+  return `${Number(value.toFixed(decimals))}%`;
+}
+
+/** Formats byte sizes into human-readable strings (e.g. 1.2 KB, 4.5 MB). */
+export function fileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const size = bytes / Math.pow(1024, i);
+  return `${size >= 10 || i === 0 ? Math.round(size) : size.toFixed(1)} ${units[i]}`;
+}
+
