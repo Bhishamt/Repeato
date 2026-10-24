@@ -34,7 +34,7 @@ to close it.
     showing the product as if it were live.
 11. **Single business per console session.** Owners with several businesses switch with a cookie; the
     UI shows one at a time.
-12. **No exports.** No CSV of transactions or customers, no scheduled reports.
+12. **Exports.** `lib/csv.ts` implements RFC 4180 CSV generation and formula injection mitigation for transactions and customers; scheduled automated reporting remains a future enhancement.
 13. **No mobile app.** The customer experience is a mobile-first web app at `/app`.
 
 ## Testing and operations

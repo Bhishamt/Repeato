@@ -74,6 +74,9 @@ traction.
   loyalty rules, menu & categories, rewards, redemptions, QR code, analytics, team, settings.
 - **Admin console**: businesses (approve/suspend), users, audit log, platform overview.
 - **Loyalty tiers & progression.** `lib/points.ts` provides multi-tier tracking (`Bronze`, `Silver`, `Gold`, `Platinum`), perk calculations (discounts and point multipliers), upgrade progress math, promo bonus boosts, and points expiration monitoring with 30-day early warnings.
+- **Secure CSV exports & reporting.** `lib/csv.ts` provides RFC 4180 compliant CSV formatting with spreadsheet formula injection mitigation (CWE-1236) for transactions and customers.
+- **Domain validation & formatting.** `lib/validate.ts` and `lib/format.ts` standardize input boundaries (slugs, vouchers, currencies, percentages, filenames) and localized date/currency/phone presentation.
+
 
 ## Loyalty Tiers & Progression
 
