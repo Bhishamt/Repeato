@@ -418,6 +418,8 @@ export async function adjustPoints(
   db: Db,
   input: { actorId: number; businessId: number; customerId: number; delta: number; reason: string },
 ) {
+  // Enforced here, not only by the server action, so every caller inherits the rule.
+  await requireMember(db, input.actorId, input.businessId, "owner");
   if (!Number.isSafeInteger(input.delta) || input.delta === 0) throw new DomainError("Enter a non-zero whole number of points.");
   if (Math.abs(input.delta) > 10_000) throw new DomainError("Single adjustments are limited to 10,000 points.");
   if (!input.reason.trim()) throw new DomainError("A reason is required for an adjustment.");

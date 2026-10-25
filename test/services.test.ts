@@ -246,3 +246,18 @@ describe("reward redemption", () => {
     ).rejects.toThrow(/below zero/);
   });
 });
+
+describe("point adjustments", () => {
+  it("only the business owner may adjust points", async () => {
+    await joinBusiness(db, customerId, businessId);
+    await expect(
+      adjustPoints(db, { actorId: staffId, businessId, customerId, delta: 50, reason: "Staff attempt" }),
+    ).rejects.toThrow(/owner/);
+    await expect(
+      adjustPoints(db, { actorId: otherOwnerId, businessId, customerId, delta: 50, reason: "Cross-business" }),
+    ).rejects.toThrow(/access to this business/);
+    expect(await getBalance(db, businessId, customerId)).toBe(20);
+    await adjustPoints(db, { actorId: ownerId, businessId, customerId, delta: 50, reason: "Owner adjustment" });
+    expect(await getBalance(db, businessId, customerId)).toBe(70);
+  });
+});
