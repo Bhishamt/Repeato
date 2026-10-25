@@ -5,7 +5,9 @@ export function toPaise(input: unknown): number | null {
   const raw = String(input).replace(/[,\s₹]/g, "");
   if (!/^\d{1,7}(\.\d{1,2})?$/.test(raw)) return null;
   const value = Math.round(Number(raw) * 100);
-  if (!Number.isSafeInteger(value) || value <= 0 || value > 10_000_000) return null;
+  // Ceiling matches the documented per-purchase limit of ₹2,00,000
+  // (docs/ARCHITECTURE.md; enforced again in recordPurchase).
+  if (!Number.isSafeInteger(value) || value <= 0 || value > 20_000_000) return null;
   return value;
 }
 
