@@ -237,8 +237,10 @@ export async function recordPurchase(db: Db, input: PurchaseInput): Promise<Purc
         .prepare("INSERT INTO ledger (business_id, customer_id, purchase_id, delta, kind, note) VALUES (?, ?, ?, ?, 'earn', ?)")
         .run(input.businessId, input.customerId, purchaseId, result.points, input.reference?.trim() || "Purchase");
     }
-    for (const line of lines) {
-      const points = result.lines.find((l) => l.name === line.name)?.points ?? 0;
+    for (const [index, line] of lines.entries()) {
+      // result.lines is built in submitted order, so index pairing stays correct
+      // even when two lines share the same product name.
+      const points = result.lines[index]?.points ?? 0;
       await tx
         .prepare(
           "INSERT INTO purchase_items (purchase_id, product_id, name, unit_price_paise, quantity, points) VALUES (?, ?, ?, ?, ?, ?)",
