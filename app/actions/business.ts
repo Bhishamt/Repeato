@@ -276,7 +276,9 @@ export async function updateLoyalty(formData: FormData) {
   await handle(formData, "owner", async (ctx) => {
     try {
       const pointsPer100 = Number(formData.get("pointsPer100"));
-      const minPurchase = toPaise(formData.get("minPurchase")) ?? 0;
+      const minPurchaseRaw = formData.get("minPurchase");
+      const minPurchaseEmpty = minPurchaseRaw === null || String(minPurchaseRaw).trim() === "";
+      const minPurchase = minPurchaseEmpty ? 0 : toPaise(minPurchaseRaw);
       const signupBonus = Number(formData.get("signupBonus"));
       const minRedeemPoints = Number(formData.get("minRedeemPoints"));
       const maxPointsPerTxn = Number(formData.get("maxPointsPerTxn"));
@@ -284,6 +286,7 @@ export async function updateLoyalty(formData: FormData) {
       if (!Number.isInteger(signupBonus) || signupBonus < 0 || signupBonus > 10_000) throw new DomainError("Welcome points must be between 0 and 10,000.");
       if (!Number.isInteger(minRedeemPoints) || minRedeemPoints < 0 || minRedeemPoints > 100_000) throw new DomainError("Minimum redemption must be between 0 and 100,000.");
       if (!Number.isInteger(maxPointsPerTxn) || maxPointsPerTxn < 1 || maxPointsPerTxn > 100_000) throw new DomainError("The per-purchase cap must be between 1 and 100,000.");
+      if (minPurchase === null) throw new DomainError("Enter a valid minimum purchase, for example 100 or 100.50.");
       if (minPurchase > 2_000_000) throw new DomainError("The minimum purchase is too high.");
       await ctx.db
         .prepare(
