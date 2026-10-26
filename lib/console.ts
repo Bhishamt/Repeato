@@ -26,7 +26,7 @@ export async function consoleContext(): Promise<ConsoleContext> {
   const requested = Number((await cookies()).get(BUSINESS_COOKIE)?.value);
   const active = (await activeMembership(user.id, Number.isInteger(requested) ? requested : undefined)) ?? memberships[0];
   const business = await getBusiness(getDb(), active.businessId);
-  if (!business) redirect("/biz/onboarding");
+  if (!business) redirect("/onboarding");
 
   return { user, memberships, active, role: active.role, business };
 }

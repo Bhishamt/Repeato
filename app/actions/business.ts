@@ -50,12 +50,12 @@ async function handle(formData: FormData, need: "owner" | "any", fn: (ctx: Ctx) 
 }
 
 export async function createOwnBusiness(formData: FormData) {
-  const user = await requireBusinessUser("/biz/onboarding");
+  const user = await requireBusinessUser("/onboarding");
   if ((await membershipsFor(user.id)).length > 0) redirect("/biz");
   const name = text(formData.get("name"), 2, 80);
   const category = text(formData.get("category"), 2, 40) ?? "Cafe";
   const city = text(formData.get("city"), 2, 60);
-  if (!name) fail("/biz/onboarding", "Enter your business name.");
+  if (!name) fail("/onboarding", "Enter your business name.");
   const db = getDb();
   const { slug } = await createBusiness(db, { ownerId: user.id, name, category, city: city ?? undefined });
   await db.prepare("UPDATE users SET role = 'owner' WHERE id = ? AND role = 'customer'").run(user.id);
