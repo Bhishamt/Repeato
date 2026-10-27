@@ -134,7 +134,7 @@ database URL and the rate-limit credentials.
    during Redis outages, while authentication and daily operations fail open to process-local memory.
 4. **Automated CI:** Both remote GitHub Actions workflow (`.github/workflows/ci.yml`) and local pipeline
    (`npm run ci`) are verified, passing TypeScript compilation, PostgreSQL migrations, DB role audits,
-   67 unit/integration/acceptance tests, production build, and Playwright e2e tests.
+   76 unit/integration/acceptance tests, production build, and Playwright e2e tests.
 
 ## Remaining Production Operational Steps
 

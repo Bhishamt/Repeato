@@ -114,7 +114,7 @@ Key helper utilities exported in [`lib/points.ts`](lib/points.ts):
 npm run dev        # dev server on :3000
 npm run build      # production build
 npm start          # serve the build
-npm test           # Vitest: points, services, RLS (RLS needs PG_TEST_URL)
+npm test           # Vitest: unit + acceptance (RLS needs PG_TEST_URL)
 npx playwright test # browser flows (starts its own dev server)
 npm run typecheck  # tsc --noEmit
 npm run seed       # demo data
