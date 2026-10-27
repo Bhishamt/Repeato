@@ -81,7 +81,7 @@ Repeato supports tiered loyalty mechanics with automated progression tracking:
 
 | Tier | Qualifying Threshold | Member Perks & Benefits |
 | :--- | :--- | :--- |
-| **Bronze** | Baseline (0 - 199 pts / < ₹2,000 spend) | Standard 1 pt per ₹100 spend |
+| **Bronze** | Baseline (0 - 199 pts / < ₹2,000 spend) | Standard 10 pts per ₹100 spend |
 | **Silver** | 200 pts or ₹2,000 lifetime spend | 5% bill discount + 10% points accelerator |
 | **Gold** | 500 pts or ₹5,000 lifetime spend | 10% bill discount + 25% points accelerator |
 | **Platinum** | 1,000 pts or ₹10,000 lifetime spend | 15% bill discount + 50% points accelerator + priority service |

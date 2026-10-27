@@ -20,7 +20,7 @@ export type PointsResult = {
 
 /**
  * Loyalty policy (documented in docs/PRODUCT_REQUIREMENTS.md):
- * - 1 point per whole ₹100 by default, configurable per business.
+ * - 10 points per whole ₹100 by default, configurable per business.
  * - Purchases below the business minimum earn nothing.
  * - A line with a product-level points override earns that many points per unit
  *   and is excluded from the spend formula, so nothing is counted twice.
@@ -167,7 +167,7 @@ export function getTierPerks(tier: LoyaltyTier): TierPerks {
       return {
         discountPercent: 0,
         pointsMultiplier: 1.0,
-        description: "Standard earning rate (1 pt per ₹100 spend)",
+        description: "Standard earning rate (10 pts per ₹100 spend)",
       };
   }
 }
