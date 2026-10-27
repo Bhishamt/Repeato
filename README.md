@@ -86,7 +86,7 @@ Repeato supports tiered loyalty mechanics with automated progression tracking:
 | **Gold** | 500 pts or ₹5,000 lifetime spend | 10% bill discount + 25% points accelerator |
 | **Platinum** | 1,000 pts or ₹10,000 lifetime spend | 15% bill discount + 50% points accelerator + priority service |
 
-Key helper utilities exported in [`lib/points.ts`](file:///d:/project/Repeato/lib/points.ts):
+Key helper utilities exported in [`lib/points.ts`](lib/points.ts):
 - `calculateCustomerTier(points, spendPaise)`: Computes active member tier.
 - `getTierPerks(tier)`: Returns discount percentage and points accelerator rate.
 - `calculateTierUpgradeRequirements(points, spendPaise)`: Computes remaining points, spend needed, and completion percentage to achieve the next tier.
@@ -115,7 +115,7 @@ npm run dev        # dev server on :3000
 npm run build      # production build
 npm start          # serve the build
 npm test           # Vitest: points, services, RLS (RLS needs PG_TEST_URL)
-npx playwright test# browser flows (starts its own dev server)
+npx playwright test # browser flows (starts its own dev server)
 npm run typecheck  # tsc --noEmit
 npm run seed       # demo data
 node scripts/pg.mjs start     # local PostgreSQL 18.4 on :55432
