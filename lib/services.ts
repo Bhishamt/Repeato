@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 import { calculatePoints, type PurchaseLine, type PointsResult } from "./points";
-import { DEFAULT_RULES, rulesFromBusiness, type Db, type Rules } from "./db";
+import { rulesFromBusiness, type Db, type Rules } from "./db";
 
 export class DomainError extends Error {
   constructor(
@@ -169,12 +169,6 @@ export type PurchaseOutcome = {
   result: PointsResult;
   duplicate?: boolean;
 };
-
-export async function previewPurchase(db: Db, businessId: number, amountPaise: number, lines: PurchaseLine[] = []) {
-  const business = await getBusiness(db, businessId);
-  const rules = business ? rulesFor(business) : DEFAULT_RULES;
-  return calculatePoints({ amountPaise, rules, lines });
-}
 
 export async function recordPurchase(db: Db, input: PurchaseInput): Promise<PurchaseOutcome> {
   await requireMember(db, input.actorId, input.businessId);
