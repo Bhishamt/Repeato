@@ -30,7 +30,7 @@ the app is `app/api/qr/[slug]/route.ts`, which renders a PNG.
 | Layer | Files | Responsibility |
 | --- | --- | --- |
 | Presentation | `app/**`, `components/**` | Server components render rows; client components exist only where interaction demands it (`sale-form`, `qr-actions`, `points-preview`, `trend-chart`, nav link) |
-| Actions | `app/actions/{auth,business,customer,admin,contact}.ts` | Session gate, `FormData` parsing, `zod`-backed validation from `lib/validate.ts`, redirect with `?ok=`/`?error=` |
+| Actions | `app/actions/{auth,business,customer,admin,contact}.ts` | Session gate, `FormData` parsing, hand-rolled validation from `lib/validate.ts` (zod only in `app/actions/contact.ts`), redirect with `?ok=`/`?error=` |
 | Domain | `lib/services.ts` | Every write. Membership, business status, points, ledger, tokens, idempotency, audit, notifications |
 | Rules | `lib/points.ts` | Pure functions: points from amount/rules/lines, next-reward progress |
 | Persistence | `lib/db.ts`, `lib/schema.ts` | Singleton connection, WAL, FK enforcement, DDL |
@@ -59,7 +59,7 @@ paths survive.
 
 `GET /join/<slug>` → business by slug (active only, suspended shows a closed state) → if signed in
 and already a member, show balance and next reward → otherwise form posts `joinFromQr` →
-`joinBusiness` inserts `business_customers` (INSERT OR IGNORE), credits `signup_bonus` as a `bonus`
+`joinBusiness` inserts `business_customers` (ON CONFLICT DO NOTHING), credits `signup_bonus` as a `bonus`
 ledger row when newly joined, notifies, audits, redirect `?joined=1&bonus=N`.
 
 ### Purchase
