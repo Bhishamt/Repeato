@@ -76,10 +76,6 @@ export async function rateLimit(
   }
 }
 
-export function isRedisConfigured(): boolean {
-  return Boolean(getRedisConfig());
-}
-
 export function resetLimits() {
   buckets.clear();
 }

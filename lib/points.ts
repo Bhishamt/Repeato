@@ -20,7 +20,7 @@ export type PointsResult = {
 
 /**
  * Loyalty policy (documented in docs/PRODUCT_REQUIREMENTS.md):
- * - 1 point per whole ₹100 by default, configurable per business.
+ * - 10 points per whole ₹100 by default, configurable per business.
  * - Purchases below the business minimum earn nothing.
  * - A line with a product-level points override earns that many points per unit
  *   and is excluded from the spend formula, so nothing is counted twice.
@@ -51,12 +51,19 @@ export function calculatePoints(input: {
   const spendLines = lines.filter((l) => l.pointsOverride == null);
   const productLines = lines.filter((l) => l.pointsOverride != null);
 
+  // The breakdown follows the submitted line order so callers can pair each
+  // entry with its input line by index, even when names repeat.
   const lineBreakdown: PointsResult["lines"] = [];
   let productPoints = 0;
-  for (const line of productLines) {
-    const pts = Math.max(0, Math.floor(line.pointsOverride ?? 0)) * line.quantity;
-    productPoints += pts;
-    lineBreakdown.push({ name: line.name, points: pts, mode: "product" });
+  for (const line of lines) {
+    if (line.pointsOverride != null) {
+      const pts = Math.max(0, Math.floor(line.pointsOverride)) * line.quantity;
+      productPoints += pts;
+      lineBreakdown.push({ name: line.name, points: pts, mode: "product" });
+    } else {
+      const pts = Math.floor((line.unitPricePaise * line.quantity / 10_000) * rules.pointsPer100);
+      lineBreakdown.push({ name: line.name, points: pts, mode: "spend" });
+    }
   }
 
   const spendBase = spendLines.length
@@ -66,10 +73,6 @@ export function calculatePoints(input: {
       : amountPaise;
 
   const basePoints = Math.floor((spendBase / 10_000) * rules.pointsPer100);
-  for (const line of spendLines) {
-    const pts = Math.floor((line.unitPricePaise * line.quantity / 10_000) * rules.pointsPer100);
-    lineBreakdown.push({ name: line.name, points: pts, mode: "spend" });
-  }
 
   const raw = productPoints + basePoints;
   const capped = raw > rules.maxPointsPerTxn;
@@ -164,7 +167,7 @@ export function getTierPerks(tier: LoyaltyTier): TierPerks {
       return {
         discountPercent: 0,
         pointsMultiplier: 1.0,
-        description: "Standard earning rate (1 pt per ₹100 spend)",
+        description: "Standard earning rate (10 pts per ₹100 spend)",
       };
   }
 }

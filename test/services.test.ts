@@ -137,6 +137,26 @@ describe("purchase verification", () => {
     ).rejects.toThrow(/does not match/);
   });
 
+  it("records per-item points when two lines share the same name", async () => {
+    await joinBusiness(db, customerId, businessId);
+    const result = await recordPurchase(db, {
+      actorId: staffId,
+      businessId,
+      customerId,
+      amountPaise: 30_000,
+      lines: [
+        { name: "Latte", unitPricePaise: 15_000, quantity: 1 },
+        { name: "Latte", unitPricePaise: 15_000, quantity: 1, pointsOverride: 30 },
+      ],
+      idempotencyKey: newKey(),
+    });
+    expect(result.points).toBe(45);
+    const items = await db
+      .prepare("SELECT points FROM purchase_items WHERE purchase_id = ? ORDER BY id")
+      .all<{ points: number }>(result.purchaseId);
+    expect(items.map((i) => i.points)).toEqual([15, 30]);
+  });
+
   it("reverses points once, owner only", async () => {
     await joinBusiness(db, customerId, businessId);
     const purchase = await recordPurchase(db, { actorId: staffId, businessId, customerId, amountPaise: 50_000, idempotencyKey: newKey() });
@@ -224,5 +244,20 @@ describe("reward redemption", () => {
     await expect(
       adjustPoints(db, { actorId: ownerId, businessId, customerId, delta: -50, reason: "too much" }),
     ).rejects.toThrow(/below zero/);
+  });
+});
+
+describe("point adjustments", () => {
+  it("only the business owner may adjust points", async () => {
+    await joinBusiness(db, customerId, businessId);
+    await expect(
+      adjustPoints(db, { actorId: staffId, businessId, customerId, delta: 50, reason: "Staff attempt" }),
+    ).rejects.toThrow(/owner/);
+    await expect(
+      adjustPoints(db, { actorId: otherOwnerId, businessId, customerId, delta: 50, reason: "Cross-business" }),
+    ).rejects.toThrow(/access to this business/);
+    expect(await getBalance(db, businessId, customerId)).toBe(20);
+    await adjustPoints(db, { actorId: ownerId, businessId, customerId, delta: 50, reason: "Owner adjustment" });
+    expect(await getBalance(db, businessId, customerId)).toBe(70);
   });
 });

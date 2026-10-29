@@ -17,26 +17,34 @@ import {
 
 describe("validation helpers", () => {
   describe("toPaise", () => {
-    it("converts standard rupee amounts and strings to integer paise", () => {
-      expect(toPaise("100")).toBe(10000);
-      expect(toPaise("100.50")).toBe(10050);
-      expect(toPaise("100.5")).toBe(10050);
-      expect(toPaise("0.75")).toBe(75);
-      expect(toPaise(250)).toBe(25000);
+    it("parses whole rupees, decimals, and formatted input", () => {
+      expect(toPaise("480")).toBe(48_000);
+      expect(toPaise("480.50")).toBe(48_050);
+      expect(toPaise("1,299.5")).toBe(129_950);
+      expect(toPaise("₹250")).toBe(25_000);
+      expect(toPaise("₹ 1,500.00")).toBe(150_000);
+      expect(toPaise(" 2,499.99 ")).toBe(249_999);
+      expect(toPaise(250)).toBe(25_000);
     });
 
-    it("handles currency symbols, commas, and whitespace", () => {
-      expect(toPaise("₹ 1,500.00")).toBe(150000);
-      expect(toPaise(" 2,499.99 ")).toBe(249999);
+    it("accepts amounts up to the documented ₹2,00,000 purchase ceiling", () => {
+      expect(toPaise("200000")).toBe(20_000_000);
+      expect(toPaise("150000")).toBe(15_000_000);
     });
 
-    it("rejects non-numeric, negative, zero, or overflow amounts", () => {
+    it("rejects amounts above ₹2,00,000", () => {
+      expect(toPaise("200000.01")).toBeNull();
+      expect(toPaise("999999")).toBeNull();
+    });
+
+    it("rejects malformed, zero, and negative values", () => {
+      expect(toPaise("")).toBeNull();
+      expect(toPaise("abc")).toBeNull();
+      expect(toPaise("12.345")).toBeNull();
       expect(toPaise("0")).toBeNull();
       expect(toPaise("-50")).toBeNull();
-      expect(toPaise("abc")).toBeNull();
       expect(toPaise(null)).toBeNull();
       expect(toPaise(undefined)).toBeNull();
-      expect(toPaise("10000001")).toBeNull(); // exceeds 10_000_000 paise limit
     });
   });
 

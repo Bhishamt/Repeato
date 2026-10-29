@@ -54,6 +54,22 @@ describe("calculatePoints", () => {
     expect(result.points).toBe(10);
   });
 
+  it("keeps the breakdown aligned with the submitted line order", () => {
+    const result = calculatePoints({
+      amountPaise: 30_000,
+      rules,
+      lines: [
+        { name: "Latte", unitPricePaise: 15_000, quantity: 1 },
+        { name: "Latte", unitPricePaise: 15_000, quantity: 1, pointsOverride: 30 },
+      ],
+    });
+    expect(result.points).toBe(45);
+    expect(result.lines).toEqual([
+      { name: "Latte", points: 15, mode: "spend" },
+      { name: "Latte", points: 30, mode: "product" },
+    ]);
+  });
+
   it("ignores unsafe integers", () => {
     expect(calculatePoints({ amountPaise: Number.NaN, rules }).eligible).toBe(false);
     expect(calculatePoints({ amountPaise: -100, rules }).eligible).toBe(false);

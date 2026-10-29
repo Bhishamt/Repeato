@@ -13,7 +13,7 @@
 
 ```
 npm run typecheck     exit 0, no output
-npm test              3 files, 37 tests passed  (~0.6s)
+npm test              8 files, 76 tests passed, 11 skipped  (~13s)
 npx playwright test   4 passed                  (~13s)
 npm run build         succeeded, every app route dynamic
 ```
@@ -23,11 +23,11 @@ The Playwright suite was run twice: once with the app on SQLite, once with
 
 ## What the suites cover
 
-`test/points.test.ts` (9) — earning rules: points per 100 major units, minimum purchase, per-transaction
-cap, product-level point overrides excluded from the spend formula, zero and nonsense input, ledger
-summation.
+`test/points.test.ts` (23) — earning rules: points per 100 major units, minimum purchase, per-transaction
+cap, product-level point overrides excluded from the spend formula, breakdown order, tier progression
+and perks, promotional bonuses, points expiration, zero and nonsense input, ledger summation.
 
-`test/services.test.ts` (17) — the domain rules that protect money:
+`test/services.test.ts` (19) — the domain rules that protect money:
 - a purchase below the business minimum awards nothing;
 - the same idempotency key submitted concurrently produces one purchase and one ledger row;
 - reversing a purchase removes the points it awarded and cannot run twice;
@@ -35,7 +35,21 @@ summation.
 - **three concurrent redemption attempts against a balance that funds one produce exactly one voucher**;
 - a voucher verifies once; four concurrent verifications yield one success;
 - cross-tenant reads and writes are rejected;
-- an admin adjustment cannot push a balance below zero.
+- an admin adjustment cannot push a balance below zero, and only an owner may adjust.
+
+`test/validate.test.ts` (4) — input parsing at the trust boundary: money boundaries including the
+₹2,00,000 ceiling, formatted input, and rejection of malformed, zero and negative values.
+
+`test/tokens.test.ts` (7) — single-use hashed email tokens: retirement of older tokens, guarded
+consumption, and expiry.
+
+`test/sessions.test.ts` (3) — session lifecycle: creation, resolution, and revocation.
+
+`test/rate-limit.test.ts` (6) — the fixed-window limiter: limits up to the configured maximum,
+window reset, and degraded-mode behaviour.
+
+`test/acceptance.test.ts` (14) — the Phase 7 acceptance scenarios: signup and onboarding, role
+checks, the purchase → reward → voucher journey, and per-tenant isolation.
 
 `test/pg-rls.test.ts` (11) — the Postgres policies, executed against a real PostgreSQL server.
 Each test assumes a user identity the way Supabase does

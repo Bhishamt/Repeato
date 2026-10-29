@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 import { calculatePoints, type PurchaseLine, type PointsResult } from "./points";
-import { DEFAULT_RULES, rulesFromBusiness, type Db, type Rules } from "./db";
+import { rulesFromBusiness, type Db, type Rules } from "./db";
 
 export class DomainError extends Error {
   constructor(
@@ -170,12 +170,6 @@ export type PurchaseOutcome = {
   duplicate?: boolean;
 };
 
-export async function previewPurchase(db: Db, businessId: number, amountPaise: number, lines: PurchaseLine[] = []) {
-  const business = await getBusiness(db, businessId);
-  const rules = business ? rulesFor(business) : DEFAULT_RULES;
-  return calculatePoints({ amountPaise, rules, lines });
-}
-
 export async function recordPurchase(db: Db, input: PurchaseInput): Promise<PurchaseOutcome> {
   await requireMember(db, input.actorId, input.businessId);
   const business = await getBusiness(db, input.businessId);
@@ -237,8 +231,10 @@ export async function recordPurchase(db: Db, input: PurchaseInput): Promise<Purc
         .prepare("INSERT INTO ledger (business_id, customer_id, purchase_id, delta, kind, note) VALUES (?, ?, ?, ?, 'earn', ?)")
         .run(input.businessId, input.customerId, purchaseId, result.points, input.reference?.trim() || "Purchase");
     }
-    for (const line of lines) {
-      const points = result.lines.find((l) => l.name === line.name)?.points ?? 0;
+    for (const [index, line] of lines.entries()) {
+      // result.lines is built in submitted order, so index pairing stays correct
+      // even when two lines share the same product name.
+      const points = result.lines[index]?.points ?? 0;
       await tx
         .prepare(
           "INSERT INTO purchase_items (purchase_id, product_id, name, unit_price_paise, quantity, points) VALUES (?, ?, ?, ?, ?, ?)",
@@ -416,6 +412,8 @@ export async function adjustPoints(
   db: Db,
   input: { actorId: number; businessId: number; customerId: number; delta: number; reason: string },
 ) {
+  // Enforced here, not only by the server action, so every caller inherits the rule.
+  await requireMember(db, input.actorId, input.businessId, "owner");
   if (!Number.isSafeInteger(input.delta) || input.delta === 0) throw new DomainError("Enter a non-zero whole number of points.");
   if (Math.abs(input.delta) > 10_000) throw new DomainError("Single adjustments are limited to 10,000 points.");
   if (!input.reason.trim()) throw new DomainError("A reason is required for an adjustment.");

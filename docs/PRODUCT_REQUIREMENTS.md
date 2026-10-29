@@ -41,7 +41,7 @@ Non-negotiables from the brief:
 | Analytics from real data | Done | `app/(business)/biz/analytics/page.tsx` |
 | In-app notifications | Done | `notifications` table + `/app/notifications` |
 | Supabase/Postgres schema + RLS | Written, not running | `supabase/migrations/` |
-| Tests | 23 unit/integration, 4 browser flows | `test/`, `e2e/` |
+| Tests | 76 unit/integration (11 skipped without PG_TEST_URL), 4 browser flows | `test/`, `e2e/` |
 | Production build | Passes | `npm run build` |
 | Docs | 8 files | `docs/` |
 

@@ -22,8 +22,9 @@ to close it.
 
 ## Product
 
-6. **No email or SMS.** No password reset, no email verification, no receipts, no expiry reminders.
-   In-app notifications only. This is the largest user-facing gap.
+6. **Email only, no SMS.** Password reset and email verification are implemented and send through
+   Resend when `RESEND_API_KEY`/`MAIL_FROM` are configured (otherwise messages go to the server log).
+   No receipts and no expiry reminders — in-app notifications only.
 7. **No POS integration.** Purchases are recorded by staff in the console, or verified from a
    customer-submitted bill. Nothing here claims otherwise.
 8. **Pricing page is illustrative.** No billing, no plans, no Stripe.
@@ -41,24 +42,22 @@ to close it.
 
 14. **No component tests.** Vitest covers points, services and RLS; React Testing Library is not
     installed. UI behaviour is covered only end-to-end.
-15. **No CI pipeline.** `typecheck`, `test`, `playwright test` and `build` are the gates; wiring them
-    into GitHub Actions is a one-file job that was not done.
-16. **No load testing.** The concurrency assertions prove correctness, not throughput.
-17. **No observability.** No structured logs, metrics or error tracking beyond console output and
+15. **No load testing.** The concurrency assertions prove correctness, not throughput.
+16. **No observability.** No structured logs, metrics or error tracking beyond console output and
     Next's error boundary.
-18. **No backups configured.** `docs/DEPLOYMENT.md` describes what to enable; nothing is scheduled.
-19. **Mobile layout is checked by hand** at 390px, not asserted in CI.
+17. **No backups configured.** `docs/DEPLOYMENT.md` describes what to enable; nothing is scheduled.
+18. **Mobile layout is checked by hand** at 390px, not asserted in CI.
 
 ## Security
 
-20. **CSP allows `'unsafe-inline'`** for scripts and styles (Next injects inline bootstrap scripts,
+19. **CSP allows `'unsafe-inline'`** for scripts and styles (Next injects inline bootstrap scripts,
     Tailwind emits inline styles). A nonce-based policy needs middleware.
-21. **Rate limiting fails open** if the shared Redis store is unreachable.
-22. **No MFA and no device/session management UI.** Sessions expire after 30 days and can be revoked
+20. **Rate limiting fails open** if the shared Redis store is unreachable.
+21. **No MFA and no device/session management UI.** Sessions expire after 30 days and can be revoked
     server-side, but users cannot inspect them.
-23. **No dependency scanning** in CI.
+22. **No dependency scanning** in CI.
 
 ## What would I fix first
 
-Email (reset + verification), then a hosted Supabase migration run with the RLS suite, then CI with
-all four gates. Those three turn a tested application into an operable one.
+A hosted Supabase migration run with the RLS suite, then load testing and structured observability.
+Those three turn a tested application into an operable one.

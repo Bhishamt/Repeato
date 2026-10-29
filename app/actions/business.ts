@@ -50,12 +50,12 @@ async function handle(formData: FormData, need: "owner" | "any", fn: (ctx: Ctx) 
 }
 
 export async function createOwnBusiness(formData: FormData) {
-  const user = await requireBusinessUser("/biz/onboarding");
+  const user = await requireBusinessUser("/onboarding");
   if ((await membershipsFor(user.id)).length > 0) redirect("/biz");
   const name = text(formData.get("name"), 2, 80);
   const category = text(formData.get("category"), 2, 40) ?? "Cafe";
   const city = text(formData.get("city"), 2, 60);
-  if (!name) fail("/biz/onboarding", "Enter your business name.");
+  if (!name) fail("/onboarding", "Enter your business name.");
   const db = getDb();
   const { slug } = await createBusiness(db, { ownerId: user.id, name, category, city: city ?? undefined });
   await db.prepare("UPDATE users SET role = 'owner' WHERE id = ? AND role = 'customer'").run(user.id);
@@ -276,7 +276,9 @@ export async function updateLoyalty(formData: FormData) {
   await handle(formData, "owner", async (ctx) => {
     try {
       const pointsPer100 = Number(formData.get("pointsPer100"));
-      const minPurchase = toPaise(formData.get("minPurchase")) ?? 0;
+      const minPurchaseRaw = formData.get("minPurchase");
+      const minPurchaseEmpty = minPurchaseRaw === null || String(minPurchaseRaw).trim() === "";
+      const minPurchase = minPurchaseEmpty ? 0 : toPaise(minPurchaseRaw);
       const signupBonus = Number(formData.get("signupBonus"));
       const minRedeemPoints = Number(formData.get("minRedeemPoints"));
       const maxPointsPerTxn = Number(formData.get("maxPointsPerTxn"));
@@ -284,6 +286,7 @@ export async function updateLoyalty(formData: FormData) {
       if (!Number.isInteger(signupBonus) || signupBonus < 0 || signupBonus > 10_000) throw new DomainError("Welcome points must be between 0 and 10,000.");
       if (!Number.isInteger(minRedeemPoints) || minRedeemPoints < 0 || minRedeemPoints > 100_000) throw new DomainError("Minimum redemption must be between 0 and 100,000.");
       if (!Number.isInteger(maxPointsPerTxn) || maxPointsPerTxn < 1 || maxPointsPerTxn > 100_000) throw new DomainError("The per-purchase cap must be between 1 and 100,000.");
+      if (minPurchase === null) throw new DomainError("Enter a valid minimum purchase, for example 100 or 100.50.");
       if (minPurchase > 2_000_000) throw new DomainError("The minimum purchase is too high.");
       await ctx.db
         .prepare(
