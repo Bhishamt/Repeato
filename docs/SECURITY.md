@@ -134,7 +134,10 @@ database URL and the rate-limit credentials.
    during Redis outages, while authentication and daily operations fail open to process-local memory.
 4. **Automated CI:** Both remote GitHub Actions workflow (`.github/workflows/ci.yml`) and local pipeline
    (`npm run ci`) are verified, passing TypeScript compilation, PostgreSQL migrations, DB role audits,
-   67 unit/integration/acceptance tests, production build, and Playwright e2e tests.
+   unit/integration/acceptance tests, production build, and Playwright e2e tests.
+5. **Structured Audit Logging & Redaction:** Security events are structured with collision-resistant identifiers,
+   ISO timestamps, and automated deep redaction of sensitive credentials (passwords, tokens, pins, cookies) in
+   `lib/audit.ts` (`test/audit.test.ts`), preventing credential leakage in operational logs and SIEM streams.
 
 ## Remaining Production Operational Steps
 
