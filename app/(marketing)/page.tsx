@@ -114,11 +114,13 @@ export default function HomePage() {
   return (
     <>
       {/* HERO */}
-      <section className="border-b border-line">
-        <div className="wrap grid items-center gap-14 py-16 md:grid-cols-[1.05fr_0.95fr] md:py-24">
+      <section className="relative overflow-hidden border-b border-line">
+        <div className="aura -left-28 -top-8 h-72 w-72 bg-brand-soft/80" aria-hidden />
+        <div className="aura -right-24 top-20 h-80 w-80 bg-copper-soft/80" aria-hidden />
+        <div className="wrap relative grid items-center gap-14 py-16 md:grid-cols-[1.05fr_0.95fr] md:py-24">
           <div className="fade-up">
             <p className="eyebrow mb-4">Customer loyalty for cafés & restaurants</p>
-            <h1 className="display max-w-[13ch] text-[2.6rem] leading-[1.02] sm:text-[3.4rem] md:text-[4rem]">
+            <h1 className="display max-w-[17ch] hyphens-none text-[2.4rem] leading-[1.06] sm:text-[3rem] md:text-[3.4rem]">
               Turn first-time visitors into regulars.
             </h1>
             <p className="mt-6 max-w-lg text-[1.02rem] leading-relaxed text-ink-soft">
@@ -199,7 +201,7 @@ export default function HomePage() {
       </section>
 
       {/* THREE STEPS */}
-      <section className="wrap py-16 md:py-20">
+      <section className="wrap py-20 md:py-28">
         <SectionTitle
           eyebrow="The loop"
           title="One scan. One verified bill. A reason to return."
@@ -267,7 +269,7 @@ export default function HomePage() {
       </section>
 
       {/* DASHBOARD PREVIEW */}
-      <section className="wrap py-16 md:py-20">
+      <section className="wrap py-20 md:py-28">
         <div className="grid gap-10 md:grid-cols-[0.9fr_1.1fr] md:items-center">
           <div>
             <SectionTitle
@@ -323,7 +325,7 @@ export default function HomePage() {
 
       {/* STEPS DETAIL */}
       <section className="border-t border-line bg-white">
-        <div className="wrap py-16 md:py-20">
+        <div className="wrap py-20 md:py-28">
           <SectionTitle eyebrow="How it works" title="From the counter sticker to the repeat visit." />
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {steps.map(({ n, title, body, icon: Icon }) => (
@@ -343,7 +345,7 @@ export default function HomePage() {
       </section>
 
       {/* FEATURES */}
-      <section className="wrap py-16 md:py-20">
+      <section className="wrap py-20 md:py-28">
         <SectionTitle eyebrow="What's inside" title="Small surface, real substance." />
         <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {features.map(({ icon: Icon, title, body }) => (
@@ -384,7 +386,7 @@ export default function HomePage() {
       </section>
 
       {/* FAQ */}
-      <section className="wrap py-16 md:py-20">
+      <section className="wrap py-20 md:py-28">
         <div className="grid gap-10 md:grid-cols-[0.8fr_1.2fr]">
           <SectionTitle eyebrow="Questions" title="The things owners ask first." />
           <div className="divide-y divide-line border-y border-line">
