@@ -1,261 +1,307 @@
 # Repeato
 
-A modern loyalty and retention platform for cafés and restaurants.
+Repeato is a loyalty and retention platform built for cafés, restaurants, and hospitality businesses that want a more structured way to keep customers engaged.
 
-Repeato helps a business turn casual customers into repeat visitors by letting them join via a QR code, earn points from verified purchases, and redeem rewards in a controlled, auditable way.
+A customer joins a business by scanning a QR code, becomes a member once, and earns points when staff record a verified purchase. Those points can later be converted into rewards and one-time vouchers that are redeemed at the counter.
 
-The core idea is simple: a customer does not get points just by scanning a QR code. A QR scan identifies the business and starts the membership flow. Points are created only when staff record a valid purchase on the server.
-
-This design keeps the system safe, consistent, and difficult to abuse.
-
-## What Repeato is
-
-Repeato is a multi-tenant SaaS-style loyalty app built for businesses that want:
-
-- customer membership via QR or direct join links
-- staff-verified purchases
-- points earned from real transactions
-- one-time reward vouchers
-- secure loyalty tracking across multiple businesses
-- separate experiences for customers, staff, owners, and admins
-
-It is designed for real-world hospitality operations, especially cafés, coffee shops, restaurants, and snack counters that need simple loyalty logic without messy spreadsheet-based tracking.
-
-## What it does
-
-### For customers
-
-Customers can:
-
-- join a business from a QR code or landing page
-- see their balance and reward status
-- redeem eligible vouchers
-- track purchases and activity history
-- view loyalty tier progress and benefits
-
-### For business staff
-
-Staff can:
-
-- record purchases for members
-- validate the sale amount
-- apply points and ledger rules in one transaction
-- redeem vouchers at the counter
-- view customer and business activity
-
-### For business owners
-
-Owners can:
-
-- manage loyalty rules and rewards
-- view customer engagement and transaction history
-- inspect analytics and business performance
-- control team access and business settings
-
-### For platform admins
-
-Admins can:
-
-- manage businesses
-- review users and onboarding status
-- inspect audit logs
-- monitor platform activity and operations
-
-## How it works internally
-
-Repeato follows a very clear pattern:
-
-1. A customer scans a QR code for a business.
-2. The app identifies the business and creates or confirms a membership.
-3. Staff record a purchase for that customer.
-4. The server validates the purchase and writes points through a ledger.
-5. The customer’s balance is computed from ledger entries, not stored as a mutable field.
-6. Rewards are created and converted into single-use vouchers.
-7. Vouchers are redeemed by staff and marked as completed once used.
-
-This is more secure than storing a simple “points balance” value that can drift or be overwritten.
-
-## Core business rule
-
-The most important rule in the product is:
+The product is designed around one critical rule:
 
 > A QR scan never awards points.
 
-Scanning only identifies the business. Points are created only on the server after a valid purchase is recorded. This prevents fake or forged point increases from the browser.
+Scanning only identifies the business. The point balance is created only by the server after a valid purchase is recorded by staff. This keeps the system secure, auditable, and resistant to manipulation.
 
-## System flow diagram
+---
 
-```mermaid
-flowchart TD
-    A[Customer scans QR code] --> B[Join or verify membership]
-    B --> C[Business customer record created]
-    C --> D[Staff records purchase]
-    D --> E[Server validates sale]
-    E --> F[Ledger entry writes points]
-    F --> G[Customer balance recalculated]
-    G --> H[Reward eligibility checked]
-    H --> I[Voucher generated / redeemed]
-    I --> J[Audit trail and history preserved]
-```
+## What Repeato is
 
-## Architecture overview
+Repeato is a multi-tenant loyalty platform for businesses that need:
 
-Repeato is built as a Next.js application with a clear separation between:
+- customer membership via QR code
+- staff-verified purchases
+- points earned from real transactions
+- reward and voucher tracking
+- role-based access for admins, owners, staff, and customers
+- analytics and customer engagement data
+- a secure ledger-based balance system instead of simple mutable points values
 
-- user-facing app routes
-- server-side business logic
-- database abstraction layer
-- validation and formatting utilities
-- tests and automation
+It is designed for real-world businesses with physical operations, especially:
+
+- cafés
+- coffee shops
+- restaurants
+- quick-service counters
+- retail loyalty programs with in-person redemption
+
+---
+
+## What Repeato does
+
+### For customers
+Customers can:
+
+- scan a business QR code
+- join once as a member
+- track points
+- view reward eligibility
+- redeem vouchers
+- check purchase and activity history
+- see progress toward loyalty tiers
+
+### For business staff
+Staff can:
+
+- record customer purchases
+- validate exact amounts
+- write points to the customer account
+- redeem customer vouchers
+- see customer history and membership status
+- handle purchases without trusting browser-side calculation
+
+### For business owners
+Owners can:
+
+- manage loyalty rules
+- create or edit rewards
+- view business analytics
+- inspect customer engagement
+- track redemptions and transactions
+- manage staff access and settings
+
+### For admins
+Admins can:
+
+- manage multiple businesses
+- review users and onboarding
+- inspect audit logs
+- monitor platform operational data
+- manage tenant-level permissions and governance
+
+---
+
+## How Repeato works
+
+The core flow is straightforward:
+
+1. A customer scans a business QR code.
+2. The app identifies which business the code belongs to.
+3. The customer joins that business once.
+4. Staff record a purchase for that customer.
+5. The server validates the purchase and writes a points entry.
+6. The customer balance is calculated from ledger data.
+7. The customer can redeem rewards if eligible.
+8. Redeemed vouchers are marked as used, preventing double redemption.
+9. Reversals are tracked rather than silently deleted.
+
+This means the system is built around trustworthy server-side logic instead of relying on client-side data.
+
+---
+
+## Product rule: why this matters
+
+The most important design rule is:
+
+> A QR scan never awards points.
+
+This rule is critical because it prevents fake point increases and browser manipulation. The app never accepts a customer’s “balance” from the browser and trusts it blindly. Instead:
+
+- the browser identifies a business
+- the server validates the purchase
+- the server writes ledger entries in a transaction
+- the balance is derived from authorized records
+
+This is a safer and more realistic model for a real loyalty system.
+
+---
+
+## Architecture
+
+Repeato is structured as a modern web app with a clear separation of responsibilities.
 
 ### Frontend
+The app uses:
 
-The UI uses:
-
-- Next.js App Router
-- React 19
+- Next.js
+- React
 - TypeScript
 - Tailwind CSS
 
 This powers:
 
+- marketing pages
 - customer app screens
 - business console screens
 - admin dashboards
-- marketing pages and onboarding flows
+- QR-based onboarding and join flows
 
 ### Backend and business logic
+Server-side logic handles:
 
-Business actions are handled through server-side logic and service layers. This keeps rules such as:
-
-- role checks
 - membership validation
 - purchase verification
+- loyalty rules
 - points calculation
-- reward issuance
-- redemption rules
+- reward generation
+- voucher redemption
+- role enforcement
+- tenant data isolation
 
-in one secure place rather than trusting browser input.
+This logic runs in trusted backend code rather than the browser.
 
 ### Database layer
+The app supports multiple database backends through a single abstraction layer:
 
-The database layer exposes a single interface while supporting two backends:
+- SQLite for local development
+- PostgreSQL for production-like or CI environments
 
-- SQLite for development and local testing
-- PostgreSQL for production-like and CI environments
+This allows the same logic to operate across both environments without rewriting the business model.
 
-The app uses an abstraction layer so the same logic works across both databases.
+---
+
+## System flow diagram
+
+```mermaid
+flowchart TD
+    A[Customer scans QR code] --> B[Business identified]
+    B --> C[Customer joins business]
+    C --> D[Staff records purchase]
+    D --> E[Server validates transaction]
+    E --> F[Ledger entry writes points]
+    F --> G[Customer balance recalculated]
+    G --> H[Reward eligibility checked]
+    H --> I[Reward voucher created]
+    I --> J[Voucher redeemed once]
+    J --> K[Audit history preserved]
+```
+
+---
 
 ## Data model philosophy
 
-Repeato uses a ledger-style model instead of a simple points column.
+Repeato does not rely on a single mutable “points” field that can drift out of sync.
 
-### Why ledger-based tracking matters
+Instead, the system uses a ledger-based approach:
 
-Instead of storing one mutable value like `customer.points`, the app records entries with deltas. This makes the system:
+- every action is recorded as an event
+- points are derived from ledger entries
+- purchases and reversals are tracked
+- balances can be recalculated consistently
+- the history stays intact for auditing
 
-- auditable
-- less error-prone
-- easier to reverse
-- safer for reconciliation
+This creates a much stronger foundation for trust and operations.
 
-When a purchase is recorded, the app adds a ledger row. When it is reversed, it creates a compensating entry instead of deleting history.
+For example:
 
-This creates a reliable trail of activity and protects the business from incorrect or manipulated balances.
+- when a purchase is recorded, a ledger entry is created
+- when a reward is redeemed, a status change is recorded
+- when a purchase is reversed, a compensating ledger entry is written
+- the system maintains an audit trail instead of deleting history
+
+This makes the product far more operationally sound than a simple point counter.
+
+---
 
 ## Rewards and vouchers
 
-The platform supports:
+Repeato supports:
 
-- points earned from purchases
-- business-specific rewards
-- one-time vouchers
-- expiry rules
-- redemption validation
-- reversal-safe status transitions
+- points generated from purchases
+- reward tiers and business-specific offers
+- voucher creation
+- expiration rules
+- single-use redemption
+- status transitions for redeemed or expired vouchers
 
-Each reward becomes a voucher that is only redeemable once, and the system checks status transitions carefully to prevent duplicate redemptions.
+A reward becomes a one-time voucher, which is validated and redeemed securely. Redeeming twice is prevented by the server.
+
+---
 
 ## Loyalty tiers
 
-Repeato includes a tier system with progression rules such as:
+The system supports loyalty progression with tiers such as:
 
 - Bronze
 - Silver
 - Gold
 - Platinum
 
-Each tier can include:
+Tiers can include:
 
-- minimum point thresholds
-- spend thresholds
-- discount multipliers
-- bonus point accelerators
+- threshold-based progression
+- spend-based qualification
+- point multipliers
+- reward discounts
 - upgrade progress tracking
 
-The tier logic is centralized in the points-related utilities so it behaves consistently across the app.
+This gives businesses a way to reward repeat customers and encourage higher lifetime value.
+
+---
 
 ## Security model
 
-Repeato is designed around secure server-side authority.
+Repeato is designed around secure server-side rules.
 
 Key security principles:
 
-- browser input is never trusted for financial changes
-- ownership and role checks happen server-side
-- membership is validated before state changes
-- duplicate operations are blocked via idempotency checks
-- ledger history remains intact for reversals
-- tenant isolation prevents cross-business access
+- no trusted browser-side point updates
+- server-side validation for all changes
+- role-based access checks
+- membership validation before reward or point actions
+- tenant isolation between businesses
+- idempotency protection for duplicate submissions
+- audit-friendly ledger tracking
 
-## User roles
+This model reduces many common flaws in loyalty software where client-side data is treated as truth.
 
-The system supports four primary roles:
+---
+
+## Roles
+
+The platform supports four core roles:
 
 - `admin`
 - `owner`
 - `staff`
 - `customer`
 
-Each role has different permissions and data access rules. Role checks are enforced on the server, not just the UI.
+Each role has distinct permissions, and the UI and server logic both enforce them.
 
-## Key features
+---
+
+## Main features
 
 - QR-based member onboarding
-- real purchase verification
-- ledger-based point accounting
-- reward conversion and vouchers
-- customer history and wallet flows
-- business analytics and reporting
-- team management and settings
-- admin oversight and audit logs
-- CSV export support with sanitation for safety
-- validation and formatting utilities for core business identifiers
+- staff-verified purchase recording
+- secure point issuance
+- reward and voucher lifecycle
+- customer wallet and activity tracking
+- business analytics
+- multi-tenant operations
+- role and permission enforcement
+- CSV or reporting support
+- validation and formatting utilities
+- clear separation of service logic from UI logic
+
+---
 
 ## Tech stack
 
-- Next.js 16
-- App Router
-- React 19
-- TypeScript strict mode
+- Next.js
+- React
+- TypeScript
 - Tailwind CSS
-- SQLite with `better-sqlite3`
-- PostgreSQL with `pg`
-- Vitest for unit and service tests
+- SQLite for local development
+- PostgreSQL for production-like use
+- Vitest for tests
 - Playwright for browser testing
-- Recharts for charting
+- Recharts for charts and analytics
 
-## Repository structure
+---
+
+## Repository layout
 
 ```text
 .
 ├─ app/
-│  ├─ (marketing)/
-│  ├─ app/
-│  ├─ biz/
-│  ├─ admin/
-│  ├─ join/
-│  └─ globals.css
 ├─ components/
 ├─ lib/
 │  ├─ auth.ts
@@ -276,62 +322,63 @@ Each role has different permissions and data access rules. Role checks are enfor
 └─ next.config.*
 ```
 
+---
+
 ## Quick start
 
-### 1. Install Node.js
-
+### Install Node.js
 Use Node.js 22 or newer.
 
 #### Windows
-
-- Install Node.js 22 from the official Node website
-- Or use `nvm-windows`:
+Install Node.js from the official website or use `nvm-windows`:
 
 ```powershell
-nvm install 22.20.0
-nvm use 22.20.0
-```
-
-#### macOS
-
-```bash
-brew install node@22
 nvm install 22
 nvm use 22
 ```
 
-You can also use `fnm` or `Volta` for version management.
+#### macOS
+Use Homebrew or nvm:
 
-### 2. Clone the project
+```bash
+brew install node@22
+```
+
+or:
+
+```bash
+nvm install 22
+nvm use 22
+```
+
+### Clone the project
 
 ```bash
 git clone https://github.com/Bhishamt/Repeato.git
 cd Repeato
 ```
 
-### 3. Install dependencies
+### Install dependencies
 
 ```bash
 npm install
 ```
 
-### 4. Create environment file
+### Create environment file
 
 ```bash
 cp .env.example .env.local
 ```
 
-If you do not want to edit the file manually yet, at minimum make sure the app has a valid database configuration.
-
-### 5. Start with demo data
+### Seed demo data
 
 ```bash
 npm run seed
 ```
 
-This creates a local demo database and prints login credentials.
+This creates demo businesses and sample users.
 
-### 6. Run the app
+### Run the app
 
 ```bash
 npm run dev
@@ -343,37 +390,81 @@ Then open:
 http://localhost:3000
 ```
 
-## Local database setup
+---
 
-### SQLite (default for local development)
+## Local setup for Windows and Mac
 
-This is the easiest setup for personal use.
+### Windows
+1. Install Node.js 22
+2. Open PowerShell or Command Prompt
+3. Clone the repo
+4. Run `npm install`
+5. Copy `.env.example` to `.env.local`
+6. Run `npm run seed`
+7. Run `npm run dev`
 
-- the app uses the local database file under `data/`
-- it is good for demos and local verification
-- no external database server is required
+Useful commands:
+
+```powershell
+npm install
+npm run seed
+npm run dev
+npm run build
+npm test
+```
+
+### macOS
+1. Install Node.js 22
+2. Open Terminal
+3. Clone the repo
+4. Run `npm install`
+5. Create `.env.local`
+6. Run `npm run seed`
+7. Run `npm run dev`
+
+Useful commands:
+
+```bash
+npm install
+npm run seed
+npm run dev
+npm run build
+npm test
+```
+
+---
+
+## Database setup
+
+### SQLite
+This is the easiest local setup:
+
+- no external database required
+- best for development and testing
+- uses a local file in `data/`
 
 ### PostgreSQL
-
-For a more production-like setup:
+For production-like local testing:
 
 ```bash
 export DATABASE_URL="postgres://postgres:postgrespassword@localhost:5432/repeato_ci"
 ```
 
-Then run:
+Then:
 
 ```bash
 node scripts/migrate.mjs --local
 ```
 
-You can also use the included PostgreSQL helper script for local service setup.
+This is used in CI and production-like verification workflows.
+
+---
 
 ## Demo accounts
 
-The seeded demo data includes several users with test access.
+The seeded data includes demo users for testing.
 
-Default password is from `DEMO_PASSWORD` and usually defaults to:
+Default password is read from `DEMO_PASSWORD`, often:
 
 ```text
 Repeato!2026
@@ -381,7 +472,7 @@ Repeato!2026
 
 Example accounts:
 
-- Platform admin: `admin@repeato.local`
+- Admin: `admin@repeato.local`
 - Business owner: `priya@bluebird.test`
 - Business staff: `arun@bluebird.test`
 - Business owner: `daniel@urbanbrew.test`
@@ -392,41 +483,41 @@ Demo join links:
 - `/join/bluebird-coffee`
 - `/join/urban-brew-cafe`
 
-## Production mindset
+---
 
-This project does not treat point issuance as a client-side operation. It is server-controlled, transaction-safe, and traceable.
-
-That makes the app much closer to a real operational product than a toy loyalty demo.
-
-## Useful scripts
+## Scripts
 
 ```bash
-npm run dev        # run local app
-npm run build      # production build
-npm start          # serve production build
-npm test           # run project tests
-npm run typecheck  # TypeScript validation
-npm run seed       # generate demo data
-npx playwright test # run UI/browser tests
+npm run dev
+npm run build
+npm start
+npm test
+npm run typecheck
+npm run seed
+npx playwright test
 ```
+
+---
 
 ## Environment variables
 
-The app expects environment values such as:
+The app expects values such as:
 
-- `DATABASE_URL` for PostgreSQL
-- `DATABASE_PATH` for SQLite
+- `DATABASE_URL`
+- `DATABASE_PATH`
 - `APP_URL`
 - `ADMIN_EMAIL`
 - `ADMIN_PASSWORD`
 - `DEMO_PASSWORD`
-- `PG_TEST_URL` for test database access
+- `PG_TEST_URL`
 
-You can set these in `.env.local`.
+These are typically configured in `.env.local`.
+
+---
 
 ## Documentation
 
-The repo includes deeper project documentation here:
+The repository also contains deeper guidance:
 
 - `docs/PRODUCT_REQUIREMENTS.md`
 - `docs/ARCHITECTURE.md`
@@ -436,8 +527,12 @@ The repo includes deeper project documentation here:
 - `docs/DEPLOYMENT.md`
 - `docs/KNOWN_LIMITATIONS.md`
 
+---
+
 ## Summary
 
-Repeato is a loyalty platform built to be practical and auditable. It is not just a points widget. It is a full operational flow for membership onboarding, purchase verification, reward issuance, redemption, and secure ledger-based tracking.
+Repeato is a loyalty platform built around real operational logic, not fake browser-only metrics. It is designed to help cafés and restaurants keep customers engaged by combining QR onboarding, verified transactions, secure points issuance, and single-use reward flows.
 
-If you want a version of this README that is even more polished for GitHub with badges, a feature grid, and a landing-page style hero section, I can generate that next.
+The software is intentionally built around trust, auditability, and clear server-side enforcement so that point accrual and redemption remain accurate and difficult to manipulate.
+
+This is a practical platform for real business operations, not a simple gimmick or toy prototype.
