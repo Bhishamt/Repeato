@@ -10,15 +10,14 @@ export default async function AuditPage() {
   const rows = await getDb()
     .prepare(
       `SELECT a.id, a.action, a.entity, a.entity_id AS entityId, a.meta, a.created_at AS createdAt,
-              u.email AS actor, b.name AS businessName
+              u.email AS actor
          FROM audit_log a
          LEFT JOIN users u ON u.id = a.actor_id
-         LEFT JOIN businesses b ON b.id = a.business_id
         ORDER BY a.id DESC LIMIT 200`,
     )
     .all<{
     id: number; action: string; entity: string; entityId: number | null; meta: string | null; createdAt: string;
-    actor: string | null; businessName: string | null;
+    actor: string | null;
   }>();
 
   return (
@@ -43,7 +42,6 @@ export default async function AuditPage() {
                   <p className="text-[0.86rem]">
                     <span className="font-mono text-[0.76rem] font-semibold text-brand">{row.action}</span>{" "}
                     <span className="text-muted">{row.entity}{row.entityId ? ` #${row.entityId}` : ""}</span>
-                    {row.businessName ? <span className="text-ink-soft"> · {row.businessName}</span> : null}
                   </p>
                   <time className="text-[0.72rem] text-muted" dateTime={row.createdAt}>{dateTime(row.createdAt)}</time>
                 </div>
