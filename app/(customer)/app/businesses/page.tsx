@@ -26,7 +26,7 @@ export default async function BusinessesPage({
               EXISTS (SELECT 1 FROM business_customers bc WHERE bc.business_id = b.id AND bc.user_id = ?) AS isMember
          FROM businesses b
         WHERE b.status = 'active' AND (LOWER(b.name) LIKE LOWER(?) OR LOWER(b.city) LIKE LOWER(?) OR LOWER(b.category) LIKE LOWER(?))
-        ORDER BY isMember DESC, b.name`,
+        ORDER BY "isMember" DESC, b.name`,
     )
     .all<{
     id: number; name: string; slug: string; category: string; city: string | null; description: string | null;
