@@ -13,3 +13,4 @@ playwright-report/
 .pgdata/
 .vercel
 .env*
+!.env.example
