@@ -16,7 +16,7 @@ export default async function AuditPage() {
         ORDER BY a.id DESC LIMIT 200`,
     )
     .all<{
-    id: number; action: string; entity: string; entityId: number | null; meta: string | null; createdAt: string;
+    id: number; action: string; entity: string; entityId: number | null; meta: unknown; createdAt: string;
     actor: string | null;
   }>();
 
@@ -46,7 +46,11 @@ export default async function AuditPage() {
                   <time className="text-[0.72rem] text-muted" dateTime={row.createdAt}>{dateTime(row.createdAt)}</time>
                 </div>
                 <p className="mt-0.5 text-[0.72rem] text-muted">{row.actor ?? "system"}</p>
-                {row.meta ? <pre className="mt-1 overflow-x-auto text-[0.68rem] text-muted">{row.meta}</pre> : null}
+                {row.meta ? (
+                  <pre className="mt-1 overflow-x-auto text-[0.68rem] text-muted">
+                    {typeof row.meta === "string" ? row.meta : JSON.stringify(row.meta)}
+                  </pre>
+                ) : null}
               </li>
             ))}
           </ol>
