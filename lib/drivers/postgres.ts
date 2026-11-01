@@ -122,6 +122,16 @@ export function toPostgresPlaceholders(sql: string): string {
       i += 1;
       continue;
     }
+    // Postgres lowercases unquoted aliases, so `AS entityId` would come back as
+    // `entityid` and every row reader would see undefined. Quote them.
+    if ((char === "A" || char === "a") && !/[\w$]/.test(sql[i - 1] ?? "")) {
+      const alias = /^AS\s+([A-Za-z_][A-Za-z0-9_]*)/i.exec(sql.slice(i, i + 64));
+      if (alias && /[a-z]/.test(alias[1]) && /[A-Z]/.test(alias[1])) {
+        out += `AS "${alias[1]}"`;
+        i += alias[0].length;
+        continue;
+      }
+    }
     out += char;
     i += 1;
   }
