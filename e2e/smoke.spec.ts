@@ -24,11 +24,10 @@ test("every marketing route renders", async ({ request }) => {
   }
 });
 
-test("protected areas redirect signed-out visitors to login", async ({ request }) => {
+test("protected areas redirect signed-out visitors to login", async ({ page }) => {
   for (const route of ["/biz", "/admin", "/app", "/biz/transactions"]) {
-    const res = await request.get(route, { maxRedirects: 0 });
-    expect([302, 307], route).toContain(res.status());
-    expect(res.headers()["location"], route).toContain("/login?next=");
+    await page.goto(route);
+    await expect(page).toHaveURL(/\/login\?next=/);
   }
 });
 

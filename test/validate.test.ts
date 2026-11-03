@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { toPaise } from "../lib/validate";
+import { isExpired } from "../lib/format";
 
 describe("toPaise", () => {
   it("parses whole rupees, decimals, and formatted input", () => {
@@ -27,5 +28,29 @@ describe("toPaise", () => {
     expect(toPaise("0")).toBeNull();
     expect(toPaise("-5")).toBeNull();
     expect(toPaise(null)).toBeNull();
+  });
+});
+
+describe("isExpired", () => {
+  it("returns false for future dates", () => {
+    const future = new Date(Date.now() + 86400000).toISOString();
+    expect(isExpired(future)).toBe(false);
+  });
+
+  it("returns true for past dates", () => {
+    const past = new Date(Date.now() - 86400000).toISOString();
+    expect(isExpired(past)).toBe(true);
+  });
+
+  it("handles SQLite formatted timestamps", () => {
+    expect(isExpired("2020-01-01 12:00:00")).toBe(true);
+    expect(isExpired("2099-01-01 12:00:00")).toBe(false);
+  });
+
+  it("fails safe (returns true) for null, undefined, or invalid dates", () => {
+    expect(isExpired(null)).toBe(true);
+    expect(isExpired(undefined)).toBe(true);
+    expect(isExpired("")).toBe(true);
+    expect(isExpired("not-a-date")).toBe(true);
   });
 });
