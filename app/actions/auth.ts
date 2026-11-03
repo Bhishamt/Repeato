@@ -9,6 +9,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { withQuery } from "@/lib/format";
 import { appUrl, sendMail } from "@/lib/email";
 import { consumeEmailToken, issueEmailToken } from "@/lib/tokens";
+import { createClient } from "@/lib/supabase/server";
 
 function fail(path: string, message: string): never {
   redirect(withQuery(path, "error", message));
@@ -140,7 +141,19 @@ export async function requestPasswordReset(formData: FormData) {
     const user = await db
       .prepare("SELECT id, name FROM users WHERE lower(email) = ? AND status = 'active'")
       .get<{ id: number; name: string }>(mail);
+
     if (user) {
+      // 1. Dispatch Supabase recovery email (PKCE recovery link via callback)
+      try {
+        const supabase = await createClient();
+        await supabase.auth.resetPasswordForEmail(mail, {
+          redirectTo: `${appUrl()}/auth/callback?next=/reset`,
+        });
+      } catch (err) {
+        console.warn("Supabase password recovery email notice:", err);
+      }
+
+      // 2. Dispatch internal email token (works locally & seamlessly in test environments)
       try {
         const raw = await issueEmailToken(db, user.id, "reset", 60);
         await sendMail({
@@ -169,20 +182,50 @@ export async function resetPassword(formData: FormData) {
   const token = text(formData.get("token"), 16, 200);
   const nextPass = parsePassword(formData.get("password"));
   const confirm = formData.get("confirm");
-  const back = `/reset?token=${encodeURIComponent(token ?? "")}`;
+  const back = `/reset${token ? `?token=${encodeURIComponent(token)}` : ""}`;
 
-  if (!token) fail("/forgot", "Open the link from your reset email, or request a new one.");
   if (!nextPass) fail(back, "Use a password of at least 8 characters.");
   if (nextPass !== confirm) fail(back, "The passwords do not match.");
 
   const db = getDb();
-  const userId = await consumeEmailToken(db, token, "reset");
+  let userId: number | null = null;
+
+  if (token) {
+    userId = await consumeEmailToken(db, token, "reset");
+  } else {
+    // Check for active Supabase recovery session established via callback
+    try {
+      const supabase = await createClient();
+      const { data } = await supabase.auth.getUser();
+      if (data?.user?.email) {
+        const userRow = await db
+          .prepare("SELECT id FROM users WHERE lower(email) = ?")
+          .get<{ id: number }>(data.user.email.toLowerCase());
+        if (userRow) userId = userRow.id;
+
+        // Synchronize updated password to Supabase Auth user record
+        await supabase.auth.updateUser({ password: nextPass });
+      }
+    } catch (err) {
+      console.warn("Supabase password update notice:", err);
+    }
+  }
+
   if (!userId) fail("/reset", "That reset link is invalid or has expired. Request a new one.");
 
   await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hashPassword(nextPass), userId);
   // Anyone holding a stolen session loses it the moment the password changes.
   await revokeUserSessions(userId);
   await audit(db, userId, "auth.password_reset", "user", userId);
+
+  // Sign out of temporary Supabase recovery session if one exists
+  try {
+    const supabase = await createClient();
+    await supabase.auth.signOut();
+  } catch {
+    // ignore
+  }
+
   redirect(withQuery("/login", "ok", "Password updated. Sign in with your new password."));
 }
 
