@@ -4,7 +4,7 @@ import { Alert, Empty, Pill } from "@/components/ui";
 import { consoleContext } from "@/lib/console";
 import { getDb } from "@/lib/db";
 import { verifyVoucher } from "@/app/actions/business";
-import { dateTime, points } from "@/lib/format";
+import { dateTime, isExpired, points } from "@/lib/format";
 
 export const metadata = { title: "Redemptions" };
 
@@ -84,7 +84,7 @@ export default async function RedemptionsPage({
         ) : (
           <ul className="divide-y divide-[#f0e9de]">
             {open.map((r) => {
-              const expired = r.expiresAt < new Date().toISOString().slice(0, 19).replace("T", " ");
+              const expired = isExpired(r.expiresAt);
               return (
                 <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
                   <div>

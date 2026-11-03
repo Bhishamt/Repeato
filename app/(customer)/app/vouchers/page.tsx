@@ -3,7 +3,7 @@ import { CalendarClock, CheckCircle2, Ticket } from "lucide-react";
 import { Alert, Empty, Pill } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { dateTime, points } from "@/lib/format";
+import { dateTime, isExpired, points } from "@/lib/format";
 
 export const metadata = { title: "My vouchers" };
 
@@ -66,7 +66,7 @@ export default async function VouchersPage({
         <div className="grid gap-3 md:grid-cols-2">
           {active.map((v) => {
             const isNew = query.issued === v.token;
-            const expired = v.expiresAt < new Date().toISOString().slice(0, 19).replace("T", " ");
+            const expired = isExpired(v.expiresAt);
             return (
               <article key={v.id} className={`card overflow-hidden ${isNew ? "ring-2 ring-brand/40" : ""}`}>
                 <div className="flex items-center justify-between border-b border-dashed border-line bg-[#fffaf4] px-5 py-3">

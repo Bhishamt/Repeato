@@ -23,10 +23,10 @@ export default async function OnboardingPage({
         </div>
       </header>
       <main id="main" className="wrap max-w-xl py-10">
-        <p className="eyebrow mb-2">One more step</p>
-        <h1 className="display text-[2rem]">Tell us about your café.</h1>
+        <p className="eyebrow mb-2">Business Setup</p>
+        <h1 className="display text-[2rem]">Add a business.</h1>
         <p className="mt-2 text-[0.92rem] leading-relaxed text-muted">
-          This creates your business, its loyalty programme and its join QR code. You can change every setting afterwards.
+          This creates your business, its loyalty programme and its permanent join QR code. You can manage multiple businesses under one account.
         </p>
 
         {query.error ? <div className="mt-4"><Alert kind="bad">{query.error}</Alert></div> : null}

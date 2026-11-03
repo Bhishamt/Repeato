@@ -51,14 +51,20 @@ async function handle(formData: FormData, need: "owner" | "any", fn: (ctx: Ctx) 
 
 export async function createOwnBusiness(formData: FormData) {
   const user = await requireBusinessUser("/onboarding");
-  if ((await membershipsFor(user.id)).length > 0) redirect("/biz");
   const name = text(formData.get("name"), 2, 80);
   const category = text(formData.get("category"), 2, 40) ?? "Cafe";
   const city = text(formData.get("city"), 2, 60);
   if (!name) fail("/onboarding", "Enter your business name.");
   const db = getDb();
-  const { slug } = await createBusiness(db, { ownerId: user.id, name, category, city: city ?? undefined });
+  const { slug, businessId } = await createBusiness(db, { ownerId: user.id, name, category, city: city ?? undefined });
   await db.prepare("UPDATE users SET role = 'owner' WHERE id = ? AND role = 'customer'").run(user.id);
+  (await cookies()).set(BUSINESS_COOKIE, String(businessId), {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: true,
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  });
   redirect(`/biz/qr?slug=${slug}`);
 }
 
@@ -69,7 +75,8 @@ export async function switchBusiness(formData: FormData) {
   if (!allowed) fail("/biz", "You do not have access to that business.");
   (await cookies()).set(BUSINESS_COOKIE, String(businessId), {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "strict",
+    secure: true,
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
   });

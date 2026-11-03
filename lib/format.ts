@@ -38,6 +38,13 @@ export function dateTime(value: string | null | undefined): string {
   return d.toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
+/** Fail-safe expiry check: returns true if the date is in the past, or if the value is missing/unparseable. */
+export function isExpired(value: string | null | undefined): boolean {
+  const d = toDate(value);
+  if (!d) return true; // fail-safe: treat missing/bad expiry as expired
+  return d.getTime() < Date.now();
+}
+
 export function relative(value: string): string {
   const d = toDate(value);
   if (!d) return "—";

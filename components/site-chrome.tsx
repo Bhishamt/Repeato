@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Coffee, Store } from "lucide-react";
 import { Wordmark } from "./ui";
 import { MarketingLink } from "./nav-link";
 import { getSessionUser, homeFor } from "@/lib/auth";
@@ -32,8 +32,19 @@ export async function SiteHeader() {
             </Link>
           ) : (
             <>
-              <Link href="/login" className="hidden rounded-full px-3 py-1.5 text-[0.86rem] font-medium text-ink-soft hover:text-ink sm:block">
-                Sign in
+              <Link
+                href="/login?as=customer"
+                className="hidden rounded-full px-3 py-1.5 text-[0.84rem] font-medium text-ink-soft hover:text-ink sm:inline-flex sm:items-center sm:gap-1.5"
+                title="Customer wallet sign in"
+              >
+                <Coffee size={14} className="text-copper" aria-hidden /> Customer wallet
+              </Link>
+              <Link
+                href="/login?as=business"
+                className="btn btn-ghost btn-sm hidden sm:inline-flex sm:items-center sm:gap-1.5"
+                title="Merchant console sign in"
+              >
+                <Store size={14} className="text-brand" aria-hidden /> Merchant console
               </Link>
               <Link href="/signup" className="btn btn-primary btn-sm">
                 Get started
@@ -42,14 +53,18 @@ export async function SiteHeader() {
           )}
           <details className="relative md:hidden">
             <summary className="btn btn-ghost btn-sm cursor-pointer list-none">Menu</summary>
-            <div className="absolute right-0 top-11 z-50 w-56 rounded-xl border border-line bg-white p-2 shadow-xl">
+            <div className="absolute right-0 top-11 z-50 w-64 rounded-xl border border-line bg-white p-2 shadow-xl">
               {NAV.map((item) => (
                 <Link key={item.href} href={item.href} className="block rounded-lg px-3 py-2 text-sm text-ink-soft hover:bg-paper-deep">
                   {item.label}
                 </Link>
               ))}
-              <Link href="/login" className="block rounded-lg px-3 py-2 text-sm text-ink-soft hover:bg-paper-deep">
-                Sign in
+              <div className="my-1 border-t border-line" />
+              <Link href="/login?as=customer" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink-soft hover:bg-paper-deep">
+                <Coffee size={14} className="text-copper" aria-hidden /> Customer sign in
+              </Link>
+              <Link href="/login?as=business" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink-soft hover:bg-paper-deep">
+                <Store size={14} className="text-brand" aria-hidden /> Merchant sign in
               </Link>
             </div>
           </details>
@@ -85,7 +100,8 @@ export function SiteFooter() {
             ["/about", "About"],
             ["/contact", "Contact"],
             ["/signup", "Create an account"],
-            ["/login", "Sign in"],
+            ["/login?as=customer", "Customer sign in"],
+            ["/login?as=business", "Merchant console"],
           ]}
         />
         <FooterCol

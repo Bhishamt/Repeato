@@ -4,6 +4,7 @@ import {
   Coffee,
   Gift,
   LayoutDashboard,
+  Plus,
   QrCode,
   Receipt,
   Settings,
@@ -50,7 +51,7 @@ export default async function BusinessLayout({ children }: { children: React.Rea
 
           <div className="flex items-center gap-2">
             {memberships.length > 1 ? (
-              <form action={switchBusiness} className="hidden md:block">
+              <form action={switchBusiness} className="block">
                 <label htmlFor="switch" className="sr-only">Switch business</label>
                 <select
                   id="switch"
@@ -65,6 +66,7 @@ export default async function BusinessLayout({ children }: { children: React.Rea
                 <button className="btn btn-ghost btn-sm ml-1" type="submit">Switch</button>
               </form>
             ) : null}
+            <Link href="/onboarding" className="btn btn-ghost btn-sm"><Plus size={13} aria-hidden /> Add Business</Link>
             <Link href="/app" className="btn btn-ghost btn-sm hidden sm:inline-flex">
               <Coffee size={13} aria-hidden /> My wallet
             </Link>
